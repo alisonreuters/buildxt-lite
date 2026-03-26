@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>BuildXT Lite</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#F7F7F7;min-height:100vh;}
+  input,textarea,button{font-family:inherit;}
+  button{cursor:pointer;}
+  textarea{resize:vertical;}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+const {useState,useMemo}=React;
+const Y="#F2B705",BG="#F7F7F7",TX="#1A1A1A",BD="#E5E5E5";
+
+// ── BOARD DEFINITIONS ──────────────────────────────────────────────
+const BOARDS={
+  merbau:     {label:"Merbau",w:90, gap:6,type:"hardwood", price:5.52, supplier:"Bunnings",real:true, top:"#7B3410",line:"#5A2408"},
+  spotted_gum:{label:"Spotted Gum",w:90,gap:6,type:"hardwood",price:8.50,supplier:"Placeholder",real:false,top:"#C4956A",line:"#9A7048"},
+  blue_gum:   {label:"Blue Gum",w:90, gap:6,type:"hardwood", price:8.20,supplier:"Placeholder",real:false,top:"#8FAF80",line:"#6A8A60"},
+  pine_budget:{label:"Pine (grooved)",w:90,gap:6,type:"pine",price:3.80,supplier:"Placeholder",real:false,top:"#DEB887",line:"#C09050"},
+  nextgen_140:{label:"NextGen 140",w:140,gap:5,type:"composite",price:18.50,supplier:"Placeholder",real:false,top:"#7A8C98",line:"#556878"},
+  nextgen_210:{label:"NextGen 210",w:210,gap:5,type:"composite",price:24.00,supplier:"Placeholder",real:false,top:"#6A7C88",line:"#3A5060"},
+  modclad:    {label:"Modclad",w:140,gap:5,type:"composite",price:17.00,supplier:"Placeholder",real:false,top:"#8A9890",line:"#607068"},
+};
+
+// ── FIXING RULES ───────────────────────────────────────────────────
+const FIXINGS={
+  hardwood: {label:"SS decking screws 14g×65mm",rate:34.95,unit:"PK",qtyPerLm:0.08,note:"Stainless essential — galv will stain hardwood"},
+  pine:     {label:"Galv nails or SS screws",rate:18.00,unit:"PK",qtyPerLm:0.08,note:"Galv nails fine on pine — upgrade to SS for longevity"},
+  composite:{label:"Hidden clip system (board specific)",rate:2.80,unit:"EA",qtyPerLm:0.70,note:"No face screws on composites — clips included"},
+};
+
+// ── PRICES FROM CSV ────────────────────────────────────────────────
+const P={
+  concrete:8.69, unipier:55.0, post90_lm:27.5,
+  bearer140_lm:23.33, bearer_dbl_lm:46.67,
+  joist90_lm:8.45, joist140_lm:13.40, blocking_lm:8.45,
+  bolt_m12:2.86, nut_m12:0.38, washer_m12:0.85,
+  deck_oil:82.95, balustrade_lm:85.0,
+  stairs_base:450, stairs_per100mm:55,
+  sundries_base:95, sundries_m2:2.5,
+};
+
+// ── STRUCTURAL RULES (AS1684) ──────────────────────────────────────
+function structRules(L,D,hmm,hasBal){
+  const high=hmm>1800, maxSpX=high?1.5:1.8, maxSpY=1.2;
+  const nPX=Math.ceil(L/maxSpX)+1, nPY=Math.ceil(D/maxSpY)+1;
+  const pXs=Array.from({length:nPX},(_,i)=>i*(L/Math.max(1,nPX-1)));
+  const pYs=Array.from({length:nPY},(_,j)=>j*(D/Math.max(1,nPY-1)));
+  return{pXs,pYs,joistLm:P[high?"joist140_lm":"joist90_lm"],joistH:high?0.14:0.09,
+    joistLabel:high?"140×45":"90×45",dblBearer:hasBal,high,maxSpX,maxSpY,
+    nFootings:nPX*nPY};
+}
+
+// ── ESTIMATE ENGINE ────────────────────────────────────────────────
+function calcEstimate(f){
+  const L=parseFloat(f.length)||5, D=parseFloat(f.width)||4, area=L*D;
+  const raised=f.deckLevel==="raised", hmm=Number(f.heightMm)||300;
+  const bk=f.deckingType||"merbau", board=BOARDS[bk];
+  const rules=structRules(L,D,hmm,f.balustradeType!=="none");
+  const {pXs,pYs,joistLm,dblBearer,nFootings}=rules;
+
+  const boardCentres=(board.w+board.gap)/1000;
+  const deckingLm=Math.ceil(area/boardCentres*1.10);
+  const bearerLm=Math.ceil(pYs.length*L);
+  const perimLm=(L+D)*2;
+  const jostLmTotal=Math.ceil((Math.ceil(L/0.45)+1)*D);
+  const blockingLm=Math.ceil(Math.floor(D/1.2)*(Math.ceil(L/0.45)+1)*0.09);
+  const nPosts=pXs.length*pYs.length;
+  const postHm=raised?(hmm/1000)+0.3:0.3;
+  const totalBolts=nPosts*2+Math.ceil(L/0.45)*2;
+  const fixing=FIXINGS[board.type];
+  const fixingQty=Math.ceil(deckingLm*fixing.qtyPerLm);
+  const oilCans=board.type!=="composite"?Math.ceil(area/12):0;
+  const stairW=Number(f.stairWidthMm)||1200;
+  const stairCost=f.stairType==="none"?0:P.stairs_base+Math.max(0,(stairW-1200)/100)*P.stairs_per100mm;
+  const balPerim=f.balustradeType!=="none"?Math.ceil(perimLm*0.6):0;
+
+  const items=[
+    {cat:"Footings",label:"Concrete footing bags 20kg",qty:nFootings*3,unit:"EA",rate:P.concrete,note:`${nFootings} footings`},
+    {cat:"Footings",label:"Uni-Pier adjustable supports",qty:nPosts,unit:"EA",rate:P.unipier,note:`${nPosts} posts`},
+    raised?{cat:"Footings",label:`Timber posts 90×90 H4 (${postHm.toFixed(1)}m)`,qty:Math.ceil(nPosts*postHm),unit:"LM",rate:P.post90_lm}:null,
+    {cat:"Structure",label:dblBearer?"Bearers 2/140×45 H4 (dbl — balustrade load)":"Bearers 140×45 H4 MGP10",qty:bearerLm,unit:"LM",rate:dblBearer?P.bearer_dbl_lm:P.bearer140_lm,note:`${pYs.length} rows`},
+    {cat:"Structure",label:`Joists ${rules.joistLabel} H3`,qty:jostLmTotal,unit:"LM",rate:joistLm,note:rules.high?"Upgraded >1800mm":""},
+    {cat:"Structure",label:"Joist blocking 90×45",qty:blockingLm,unit:"LM",rate:P.blocking_lm},
+    {cat:"Fixings",label:"Bolts M12×120 HDG",qty:totalBolts,unit:"EA",rate:P.bolt_m12},
+    {cat:"Fixings",label:"Nuts M12 HDG",qty:totalBolts,unit:"EA",rate:P.nut_m12},
+    {cat:"Fixings",label:"Washers M12 galv",qty:totalBolts*2,unit:"EA",rate:P.washer_m12},
+    {cat:"Decking",label:`${board.label} ${board.w}×19 decking`,qty:deckingLm,unit:"LM",rate:board.price,note:`${area.toFixed(1)}m²`},
+    {cat:"Decking",label:fixing.label,qty:fixingQty,unit:fixing.unit,rate:fixing.rate,note:fixing.note},
+    oilCans>0?{cat:"Decking",label:"Decking oil 4L",qty:oilCans,unit:"EA",rate:P.deck_oil}:null,
+    f.stairType!=="none"?{cat:"Features",label:`Stairs allowance (${stairW}mm wide)`,qty:1,unit:"ITEM",rate:stairCost}:null,
+    balPerim>0?{cat:"Features",label:"Balustrade allowance",qty:balPerim,unit:"LM",rate:P.balustrade_lm,note:"~60% perimeter"}:null,
+    {cat:"Sundries",label:"Sundries & consumables",qty:1,unit:"ITEM",rate:P.sundries_base+area*P.sundries_m2},
+  ].filter(Boolean);
+
+  const labourRate=raised?72:55;
+  items.push({cat:"Labour",label:"Labour allowance",qty:Math.ceil(area),unit:"m²",rate:labourRate,note:"Indicative"});
+
+  const total=items.reduce((s,i)=>s+(i.qty||0)*(i.rate||0),0);
+  const cats=[...new Set(items.map(i=>i.cat))];
+  return{items,total,area,cats,ratePerM2:area>0?total/area:0};
+}
+
+// ── ISO CUTAWAY RENDER ─────────────────────────────────────────────
+function dk(hex,f){
+  const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+  return`#${[r,g,b].map(v=>Math.max(0,Math.min(255,Math.round(v*f))).toString(16).padStart(2,"0")).join("")}`;
+}
+function isoP(x,y,z,ox,oy,sc){return[(x-y)*sc*0.866+ox,(x+y)*sc*0.5-z*sc*0.9+oy];}
+function isoBox(x,y,z,w,d,h,fill,stroke,sw,ox,oy,sc){
+  const p=(px,py,pz)=>isoP(px,py,pz,ox,oy,sc);
+  const j=a=>a.map(v=>v.join(",")).join(" ");
+  return[
+    React.createElement("polygon",{key:"t",points:j([p(x,y,z+h),p(x+w,y,z+h),p(x+w,y+d,z+h),p(x,y+d,z+h)]),fill,stroke,strokeWidth:sw}),
+    React.createElement("polygon",{key:"f",points:j([p(x,y+d,z+h),p(x+w,y+d,z+h),p(x+w,y+d,z),p(x,y+d,z)]),fill:dk(fill,0.68),stroke,strokeWidth:sw}),
+    React.createElement("polygon",{key:"r",points:j([p(x+w,y,z+h),p(x+w,y+d,z+h),p(x+w,y+d,z),p(x+w,y,z)]),fill:dk(fill,0.82),stroke,strokeWidth:sw}),
+  ];
+}
+
+function CutawayRender({form}){
+  const vw=Math.min(480,window.innerWidth-32);
+  const H=Math.round(vw*0.80);
+  const ox=vw*0.50,oy=H*0.70,sc=vw/560*24;
+  const L=Math.max(2,parseFloat(form.length)||5),D=Math.max(2,parseFloat(form.width)||4);
+  const raised=form.deckLevel==="raised",hM=raised?(Number(form.heightMm)||800)/1000:0.15;
+  const bk=form.deckingType||"merbau",b=BOARDS[bk];
+  const bwM=(b.w+b.gap)/1000,dir=form.layoutBoard||"EW";
+  const sp=form.layoutStairs||"S",stFull=form.layoutStairsFull;
+  const stWm=stFull?L:Math.min((Number(form.stairWidthMm)||1200)/1000,L*0.75);
+  const stX0=(sp==="S"||sp==="N")?(L-stWm)/2:0;
+  const stY0=(sp==="E"||sp==="W")?(D-stWm)/2:0;
+  const hasBal=form.balustradeType&&form.balustradeType!=="none";
+  const hasStairs=form.stairType&&form.stairType!=="none";
+  const poolAdj=form.poolAdjacent;
+  const balH=poolAdj?1.2:1.0;
+  const rules=structRules(L,D,Number(form.heightMm)||800,hasBal);
+  const {pXs,pYs,joistH,dblBearer}=rules;
+  const doubleH=dblBearer?0.29:0.145;
+  const deckZ=doubleH+joistH,boardH=0.022,cutF=0.38;
+
+  const els=[];let kid=0;const K=()=>String(kid++);
+  const add=(x,y,z,w,d,h,fill,stroke,sw=0.8)=>isoBox(x,y,z,w,d,h,fill,stroke,sw,ox,oy,sc).forEach(e=>els.push(React.cloneElement(e,{key:K()})));
+
+  // Ground
+  els.push(React.createElement("polygon",{key:K(),points:[[-0.7,-0.7],[L+0.7,-0.7],[L+0.7,D+1.2],[-0.7,D+1.2]].map(([x,y])=>isoP(x,y,-0.28,ox,oy,sc).join(",")).join(" "),fill:"#5E8040",stroke:"#4A6A30",strokeWidth:0.4}));
+  for(let i=-0.6;i<=L+0.7;i+=0.55){const a=isoP(i,-0.7,-0.28,ox,oy,sc),b2=isoP(i,D+1.2,-0.28,ox,oy,sc);els.push(React.createElement("line",{key:K(),x1:a[0],y1:a[1],x2:b2[0],y2:b2[1],stroke:"#4A6A30",strokeWidth:0.22,opacity:0.45}));}
+  // Soil
+  els.push(React.createElement("polygon",{key:K(),points:[isoP(-0.05,D+0.05,-0.28,ox,oy,sc),isoP(L*0.40,D+0.05,-0.28,ox,oy,sc),isoP(L*0.40,D+0.05,-(hM+0.35),ox,oy,sc),isoP(-0.05,D+0.05,-(hM+0.35),ox,oy,sc)].map(p=>p.join(",")).join(" "),fill:"#8B7050",stroke:"#6A5438",strokeWidth:0.6}));
+  // Footings + posts
+  pXs.forEach(px=>pYs.forEach(py=>{
+    add(px-0.13,py-0.13,-(hM+0.30),0.26,0.26,0.24,"#A8A8A8","#808080",0.5);
+    if(raised)add(px-0.055,py-0.055,-hM+0.001,0.11,0.11,hM-0.001,"#C4C4CC","#9090A0",0.5);
+    else add(px-0.07,py-0.07,-0.18,0.14,0.14,0.18,"#B8B8C0","#909090",0.5);
+    add(px-0.072,py-0.072,0,0.144,0.144,0.045,"#888898","#606068",0.5);
+  }));
+  // Bearers
+  pYs.forEach(py=>add(0,py-0.045,0,L,0.09,doubleH,"#C8A060","#A07840",0.7));
+  // Joists
+  const nJ=Math.ceil(L/0.45)+1;
+  Array.from({length:nJ},(_,i)=>{const jx=i*(L/Math.max(1,nJ-1));add(jx-0.025,0,doubleH,0.05,D,joistH,"#B89050","#906830",0.5);});
+  // Decking boards
+  if(dir==="EW"){let by=0;while(by<=D+0.001){const xS=by/D<cutF?L*cutF:0;if(L-xS>0.01)add(xS,by,deckZ,L-xS,bwM*0.86,boardH,b.top,b.line,0.45);by+=bwM;}}
+  else{let bx=0;while(bx<=L+0.001){const yS=bx/L<cutF?D*cutF:0;if(D-yS>0.01)add(bx,yS,deckZ,bwM*0.86,D-yS,boardH,b.top,b.line,0.45);bx+=bwM;}}
+  // Balustrade
+  if(hasBal){
+    const bStyle=form.balustradeType,bpw=0.06,pSp=1.5,railZ=deckZ+boardH+balH-0.05;
+    const sPosts=[];
+    for(let px=0;px<=L+0.01;px+=pSp){const inG=hasStairs&&sp==="S"&&px>stX0-0.15&&px<stX0+stWm+0.15;if(!inG)sPosts.push(Math.min(px,L));}
+    sPosts.forEach(px=>add(px-bpw/2,D-bpw,deckZ+boardH,bpw,bpw,balH,"#C8C8C8","#A0A0A0",0.5));
+    if(bStyle==="madison"||bStyle==="santa_rosa"){
+      sPosts.forEach((px,i)=>{if(i<sPosts.length-1){const nx=sPosts[i+1];for(let pp=px+0.12;pp<nx-0.02;pp+=0.12)add(pp-0.013,D-bpw/2,deckZ+boardH+0.05,0.025,0.02,balH*0.85,"#C0C0C0","#A0A0A0",0.4);}});
+    } else if(bStyle==="antigua"||bStyle==="martinique"){
+      sPosts.forEach((px,i)=>{if(i<sPosts.length-1){const nx=sPosts[i+1];add(px+bpw,D-bpw/2,deckZ+boardH+0.06,nx-px-bpw,0.015,balH*0.82,"#B8D4E8","#90B8D0",0.5);}});
+    } else if(bStyle==="wire"){
+      sPosts.forEach((px,i)=>{if(i<sPosts.length-1){const nx=sPosts[i+1];[0.15,0.28,0.41,0.54,0.67].forEach(f=>{const wz=deckZ+boardH+balH*f;const a=isoP(px,D-bpw/2,wz,ox,oy,sc),b2=isoP(nx,D-bpw/2,wz,ox,oy,sc);els.push(React.createElement("line",{key:K(),x1:a[0],y1:a[1],x2:b2[0],y2:b2[1],stroke:"#C0B070",strokeWidth:0.6}));});}});
+    } else if(bStyle==="rendered"){
+      sPosts.forEach((px,i)=>{if(i<sPosts.length-1){const nx=sPosts[i+1];add(px+bpw,D-bpw/2,deckZ+boardH,nx-px-bpw,0.12,balH*0.85,"#D4C8A8","#B0A080",0.6);}});
+    }
+    if(hasStairs&&sp==="S"){if(stX0>0.2)add(0,D-bpw,railZ,stX0,bpw,0.05,"#C8C8C8","#A0A0A0",0.5);if(stX0+stWm<L-0.2)add(stX0+stWm,D-bpw,railZ,L-stX0-stWm,bpw,0.05,"#C8C8C8","#A0A0A0",0.5);}
+    else add(0,D-bpw,railZ,L,bpw,0.05,"#C8C8C8","#A0A0A0",0.5);
+    const wPosts=[];for(let py=0;py<=D+0.01;py+=pSp){const inG=hasStairs&&sp==="W"&&py>stY0-0.15&&py<stY0+stWm+0.15;if(!inG)wPosts.push(Math.min(py,D));}
+    wPosts.forEach(py=>add(-bpw,py-bpw/2,deckZ+boardH,bpw,bpw,balH,"#C8C8C8","#A0A0A0",0.5));
+    add(-bpw,0,railZ,bpw,D,0.05,"#C8C8C8","#A0A0A0",0.5);
+  }
+  // Stairs
+  if(hasStairs){
+    const nSt=Math.max(3,Math.round((deckZ+boardH)/0.175)+1),stH=(deckZ+boardH)/nSt,stDp=0.28;
+    if(sp==="S")Array.from({length:nSt},(_,i)=>add(stX0,D+i*stDp,(deckZ+boardH)-stH*(i+1),stWm,stDp,stH,"#C8A060","#A07840",0.7));
+    else if(sp==="N")Array.from({length:nSt},(_,i)=>add(stX0,-(i+1)*stDp,(deckZ+boardH)-stH*(i+1),stWm,stDp,stH,"#C8A060","#A07840",0.7));
+    else if(sp==="E")Array.from({length:nSt},(_,i)=>add(L+i*stDp,stY0,(deckZ+boardH)-stH*(i+1),stDp,stWm,stH,"#C8A060","#A07840",0.7));
+    else if(sp==="W")Array.from({length:nSt},(_,i)=>add(-(i+1)*stDp,stY0,(deckZ+boardH)-stH*(i+1),stDp,stWm,stH,"#C8A060","#A07840",0.7));
+  }
+  // BBQ / Alfresco
+  if((form.placements||{}).bbq){add(L-1.7,0.2,deckZ+boardH,0.95,0.7,0.06,"#FFF0C0","#E0A800",1.2);const p=isoP(L-1.22,0.55,deckZ+boardH+0.18,ox,oy,sc);els.push(React.createElement("text",{key:K(),x:p[0],y:p[1],textAnchor:"middle",fontSize:9,fill:"#7A5800",fontWeight:"bold"},"BBQ"));}
+  if((form.placements||{}).alfresco){add(0.2,0.2,deckZ+boardH,1.6,0.95,0.06,"#D8F0FF","#4AABDE",1.2);const p=isoP(1.0,0.67,deckZ+boardH+0.18,ox,oy,sc);els.push(React.createElement("text",{key:K(),x:p[0],y:p[1],textAnchor:"middle",fontSize:9,fill:"#1A5F7A",fontWeight:"bold"},"Alfresco"));}
+  // Callouts
+  const co=(wx,wy,wz,lbl,side="left")=>{const[px,py]=isoP(wx,wy,wz,ox,oy,sc);const dx=side==="right"?1:-1;const ex=px+dx*48,ey=py-14;els.push(React.createElement("g",{key:K()},React.createElement("circle",{cx:px,cy:py,r:2,fill:"#999"}),React.createElement("line",{x1:px,y1:py,x2:ex,y2:ey,stroke:"#aaa",strokeWidth:0.7,strokeDasharray:"3,2"}),React.createElement("line",{x1:ex,y1:ey,x2:ex+dx*34,y2:ey,stroke:"#aaa",strokeWidth:0.7}),React.createElement("text",{x:ex+dx*36,y:ey+3.5,textAnchor:side==="right"?"start":"end",fontSize:9,fill:"#444",fontWeight:"500"},lbl)));};
+  co(0.1,D+0.1,-(hM+0.12),"Footings");
+  if(raised)co(0.1,D+0.1,-hM*0.45,"Uni-Pier posts");
+  co(0,pYs[1]||1.2,doubleH*0.5,dblBearer?"Dbl bearer":"Bearer 140×45");
+  co(0.45*1.5,0,doubleH+joistH*0.5,`Joist ${rules.joistLabel}`);
+  co(L,D/2,deckZ+boardH+0.01,`${b.w}mm ${b.label}`,"right");
+  if(hasBal)co(L*0.55,D,deckZ+boardH+0.5,poolAdj?"Bal. 1200 (pool)":"Balustrade","right");
+
+  return React.createElement("svg",{width:vw,height:H,style:{display:"block",maxWidth:"100%",borderRadius:10}},
+    React.createElement("rect",{width:vw,height:H,fill:"#EDE8E0",rx:10}),...els,
+    React.createElement("text",{x:vw/2,y:H-10,textAnchor:"middle",fontSize:9,fill:"#aaa"},`${form.length}m × ${form.width}m · ${raised?"Raised "+form.heightMm+"mm":"Ground level"} · ${b.w}mm ${b.label}`)
+  );
+}
+
+// ── JEFF'S FIXING RECOMMENDATION ──────────────────────────────────
+function jeffFixNote(bk){
+  const b=BOARDS[bk];
+  if(b.type==="composite")return`${b.label} uses hidden clips — no face screws. I've included them.`;
+  if(bk==="merbau")return"Merbau bleeds tannins — I've specced SS screws. Galv nails would stain your deck.";
+  if(bk==="spotted_gum"||bk==="blue_gum")return`${b.label} is very hard — pre-drilling essential. SS screws specced.`;
+  return"Galv nails work fine on pine — or upgrade to SS for longevity.";
+}
+
+// ── MAIN APP ───────────────────────────────────────────────────────
+function App(){
+  const [screen,setScreen]=useState(1);
+  const [form,setForm]=useState({
+    name:"",postcode:"",projectType:"Deck",description:"",
+    length:"5.0",width:"4.0",siteCondition:"",deckLevel:"ground",
+    heightMm:800,layoutBoard:"EW",layoutStairs:"S",layoutStairsFull:false,
+    deckingType:"merbau",stairType:"standard",stairWidthMm:1200,
+    balustradeType:"none",poolAdjacent:false,
+    placements:{bbq:null,alfresco:null}
+  });
+  const [errors,setErrors]=useState({});
+  const upd=(k,v)=>setForm(p=>({...p,[k]:v}));
+  const back=()=>{setErrors({});setScreen(s=>Math.max(1,s-1));};
+  const est=useMemo(()=>calcEstimate(form),[form]);
+  const rules=useMemo(()=>structRules(parseFloat(form.length)||5,parseFloat(form.width)||4,Number(form.heightMm)||800,form.balustradeType!=="none"),[form]);
+
+  const validate=(s)=>{
+    const e={};
+    if(s===1){if(!(form.name||"").trim())e.name="Please enter your name.";if(!/^\d{4}$/.test(form.postcode||""))e.postcode="4-digit postcode required.";}
+    if(s===3){if(!form.siteCondition)e.siteCondition="Select site condition.";if(!form.deckLevel)e.deckLevel="Select ground or raised.";}
+    setErrors(e);return Object.keys(e).length===0;
+  };
+  const go=(s)=>{if(!validate(s))return;setScreen(x=>x+1);};
+
+  const TOTAL_SCREENS=6;
+  const s=(obj={})=>({...obj});
+
+  // Style helpers
+  const card=(ch,extra={})=>React.createElement("div",{style:{background:"white",borderRadius:16,border:`1px solid ${BD}`,padding:16,marginBottom:12,...extra}},ch);
+  const jeff=(t)=>React.createElement("div",{style:{fontSize:20,fontWeight:600,lineHeight:1.35,color:TX,marginBottom:12}},t);
+  const PBtn=({label,onClick})=>React.createElement("button",{onClick,style:{width:"100%",height:50,borderRadius:12,fontWeight:700,fontSize:16,background:Y,border:"none",marginBottom:8}},label);
+  const BackBtn=()=>screen>1?React.createElement("button",{onClick:back,style:{background:"none",border:"none",fontSize:14,fontWeight:600,textDecoration:"underline",padding:"4px 0",display:"block",color:TX}},"← Back"):null;
+  const Err=(k)=>errors[k]?React.createElement("div",{style:{fontSize:12,color:"#e53e3e",marginBottom:6}},errors[k]):null;
+  const dots=()=>React.createElement("div",{style:{display:"flex",justifyContent:"center",gap:6,padding:"6px 0 10px"}},Array.from({length:TOTAL_SCREENS},(_,i)=>React.createElement("div",{key:i,style:{width:8,height:8,borderRadius:4,background:i+1===screen?Y:BD}})));
+  const T=(active,onClick,label)=>React.createElement("button",{onClick,style:{padding:"6px 13px",borderRadius:20,border:`1.5px solid ${active?Y:BD}`,background:active?"#FFF9E6":"white",fontSize:12,fontWeight:active?700:400,marginBottom:4}},label);
+  const NB=(val,setFn,step,min,max,fmt)=>React.createElement("div",{style:{display:"flex",alignItems:"center",gap:6}},
+    React.createElement("button",{onClick:()=>setFn(v=>typeof v==="string"?(Math.max(min,parseFloat(v)-step)).toFixed(1):Math.max(min,v-step)),style:{width:32,height:32,borderRadius:8,border:`1px solid ${BD}`,background:"white",fontSize:18}},"-"),
+    React.createElement("span",{style:{fontWeight:700,fontSize:14,minWidth:64,textAlign:"center"}},fmt?fmt(val):val),
+    React.createElement("button",{onClick:()=>setFn(v=>typeof v==="string"?(Math.min(max,parseFloat(v)+step)).toFixed(1):Math.min(max,v+step)),style:{width:32,height:32,borderRadius:8,border:`1px solid ${BD}`,background:"white",fontSize:18}},"+")
+  );
+
+  const boardGroups=[
+    {group:"Hardwood",keys:["merbau","spotted_gum","blue_gum"]},
+    {group:"Composite",keys:["nextgen_140","nextgen_210","modclad"]},
+    {group:"Budget",keys:["pine_budget"]},
+  ];
+
+  const balStyles=[
+    {key:"none",label:"None"},
+    {key:"madison",label:"Madison (picket)"},
+    {key:"santa_rosa",label:"Santa Rosa"},
+    {key:"antigua",label:"Antigua (glass)"},
+    {key:"martinique",label:"Martinique (glass)"},
+    {key:"wire",label:"Wire tension"},
+    {key:"rendered",label:"Rendered panel"},
+  ];
+
+  return React.createElement("div",{style:{background:BG,minHeight:"100vh"}},
+    React.createElement("div",{style:{maxWidth:440,margin:"0 auto",padding:"0 16px 40px"}},
+
+      // Header
+      React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"14px 0 2px"}},
+        React.createElement("div",{style:{fontSize:22,fontWeight:700,color:TX}},"BUILD",React.createElement("span",{style:{color:Y}},"XT")),
+        React.createElement("button",{style:{padding:"7px 14px",borderRadius:20,border:`1px solid ${BD}`,background:"white",fontSize:12}},"Upload plans / photos")
+      ),
+      dots(),
+
+      // ── SCREEN 1: Welcome ──────────────────────────────────────
+      screen===1&&React.createElement("div",null,
+        jeff("Welcome to your neXT build"),
+        card(React.createElement("div",null,
+          React.createElement("div",{style:{fontSize:13,color:"#666",marginBottom:12}},"Hi — I'm Jeff. I'll guide you through your project estimate in about 2 minutes."),
+          React.createElement("label",{style:{fontSize:13,fontWeight:500,display:"block",marginBottom:6}},"Your name"),
+          React.createElement("input",{value:form.name,onChange:e=>upd("name",e.target.value),placeholder:"Your name",style:{width:"100%",height:46,border:`1px solid ${BD}`,borderRadius:12,padding:"0 12px",fontSize:15,marginBottom:4}}),
+          Err("name"),
+          React.createElement("label",{style:{fontSize:13,fontWeight:500,display:"block",margin:"10px 0 6px"}},"Your postcode"),
+          React.createElement("input",{value:form.postcode,onChange:e=>upd("postcode",e.target.value.replace(/\D/g,"").slice(0,4)),placeholder:"e.g. 2095",inputMode:"numeric",style:{width:"100%",height:46,border:`1px solid ${BD}`,borderRadius:12,padding:"0 12px",fontSize:15,marginBottom:4}}),
+          React.createElement("div",{style:{fontSize:11,color:"#aaa",marginTop:2}},"Used to check wind, terrain and local rates."),
+          Err("postcode")
+        )),
+        React.createElement(PBtn,{label:"Let's go",onClick:()=>go(1)})
+      ),
+
+      // ── SCREEN 2: Project type ─────────────────────────────────
+      screen===2&&React.createElement("div",null,
+        jeff(`Hi ${form.name||"there"} — what are you building?`),
+        card(React.createElement("div",null,
+          React.createElement("div",{style:{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:7,marginBottom:12}},
+            ["Deck","Pergola","Cabana","Gazebo","Shed","Carport","Garage","Extension","Renovation"].map(p=>React.createElement("button",{key:p,style:{padding:"10px 4px",borderRadius:11,border:form.projectType===p?`2px solid ${Y}`:`1px solid ${BD}`,background:form.projectType===p?"#FFF9E6":"white",fontSize:13,fontWeight:form.projectType===p?700:400},onClick:()=>upd("projectType",p)},p))
+          ),
+          React.createElement("textarea",{value:form.description,onChange:e=>upd("description",e.target.value),placeholder:`Describe your ${(form.projectType||"project").toLowerCase()} — size, style, features...`,style:{width:"100%",minHeight:76,border:"1px solid #111",borderRadius:12,padding:10,fontSize:14,marginBottom:10}}),
+          React.createElement("div",{style:{fontSize:13,fontWeight:500,marginBottom:8}},"Rough dimensions"),
+          ["length","width"].map(k=>React.createElement("div",{key:k,style:{marginBottom:10}},
+            React.createElement("div",{style:{fontSize:12,color:"#888",marginBottom:4}},k==="length"?"Length":"Width"),
+            React.createElement("div",{style:{display:"flex",gap:8,alignItems:"center"}},
+              React.createElement("button",{style:{width:44,height:44,border:`1px solid ${BD}`,borderRadius:10,fontSize:20,background:"white"},onClick:()=>upd(k,(Math.max(1,parseFloat(form[k]||0)-0.5)).toFixed(1))},"-"),
+              React.createElement("div",{style:{flex:1,textAlign:"center",fontSize:18,fontWeight:600}},form[k]," m"),
+              React.createElement("button",{style:{width:44,height:44,border:`1px solid ${BD}`,borderRadius:10,fontSize:20,background:"white"},onClick:()=>upd(k,(parseFloat(form[k]||0)+0.5).toFixed(1))},"+")
+            )
+          )),
+          React.createElement("div",{style:{textAlign:"center",fontSize:13,color:"#777"}},"Area: ",React.createElement("b",null,est.area.toFixed(1)," m²"))
+        )),
+        React.createElement(PBtn,{label:"Continue",onClick:()=>go(2)}),
+        React.createElement(BackBtn,null)
+      ),
+
+      // ── SCREEN 3: Site + Spec ──────────────────────────────────
+      screen===3&&React.createElement("div",null,
+        jeff("Tell me about the site"),
+        card(React.createElement("div",null,
+          React.createElement("div",{style:{fontSize:13,fontWeight:500,marginBottom:8}},"Is the site flat?"),
+          React.createElement("div",{style:{display:"flex",gap:8,marginBottom:16}},
+            [["flat","Flat","No excavation needed"],["work","Needs work","Some levelling required"]].map(([v,l,s])=>React.createElement("button",{key:v,style:{flex:1,padding:"12px 8px",borderRadius:12,border:form.siteCondition===v?`2px solid ${Y}`:`1px solid #111`,background:form.siteCondition===v?"#FFF9E6":"white",textAlign:"left"},onClick:()=>upd("siteCondition",v)},React.createElement("div",{style:{fontSize:14,fontWeight:form.siteCondition===v?700:400}},l),React.createElement("div",{style:{fontSize:11,color:"#888",marginTop:2}},s)))
+          ),
+          Err("siteCondition"),
+          React.createElement("div",{style:{fontSize:13,fontWeight:500,marginBottom:8}},"Ground level or raised?"),
+          React.createElement("div",{style:{display:"flex",gap:8,marginBottom:12}},
+            [["ground","Ground level","Pad footings + bearer supports"],["raised","Raised","Posts, footings + bracing"]].map(([v,l,s])=>React.createElement("button",{key:v,style:{flex:1,padding:"12px 8px",borderRadius:12,border:form.deckLevel===v?`2px solid ${Y}`:`1px solid #111`,background:form.deckLevel===v?"#FFF9E6":"white",textAlign:"left"},onClick:()=>upd("deckLevel",v)},React.createElement("div",{style:{fontSize:14,fontWeight:form.deckLevel===v?700:400}},l),React.createElement("div",{style:{fontSize:11,color:"#888",marginTop:2}},s)))
+          ),
+          Err("deckLevel"),
+          form.deckLevel==="raised"&&React.createElement("div",{style:{background:"#FAFAFA",borderRadius:12,padding:12,marginBottom:8}},
+            React.createElement("div",{style:{fontSize:13,fontWeight:500,marginBottom:8}},"Height above ground"),
+            React.createElement("div",{style:{display:"flex",gap:8,alignItems:"center"}},
+              React.createElement("button",{style:{width:44,height:44,border:`1px solid ${BD}`,borderRadius:10,fontSize:20,background:"white"},onClick:()=>upd("heightMm",Math.max(200,Number(form.heightMm)-100))},"-"),
+              React.createElement("div",{style:{flex:1,textAlign:"center",fontWeight:600,fontSize:18}},form.heightMm," mm"),
+              React.createElement("button",{style:{width:44,height:44,border:`1px solid ${BD}`,borderRadius:10,fontSize:20,background:"white"},onClick:()=>upd("heightMm",Number(form.heightMm)+100)},"+")
+            ),
+            React.createElement("div",{style:{fontSize:11,color:"#888",marginTop:6}},"800mm is typical for an outdoor entertaining deck.")
+          )
+        )),
+        card(React.createElement("div",null,
+          React.createElement("div",{style:{fontSize:13,fontWeight:500,marginBottom:10}},"Choose your decking board"),
+          boardGroups.map(({group,keys})=>React.createElement("div",{key:group,style:{marginBottom:12}},
+            React.createElement("div",{style:{fontSize:11,fontWeight:600,color:"#aaa",textTransform:"uppercase",letterSpacing:1,marginBottom:6}},group),
+            keys.map(k=>{const bd=BOARDS[k],sel=form.deckingType===k;return React.createElement("button",{key:k,style:{width:"100%",padding:"10px 12px",borderRadius:11,border:sel?`2px solid ${Y}`:`1px solid ${BD}`,background:sel?"#FFF9E6":"white",textAlign:"left",display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5},onClick:()=>upd("deckingType",k)},
+              React.createElement("div",null,React.createElement("div",{style:{fontSize:13,fontWeight:sel?700:400}},bd.label," ",React.createElement("span",{style:{fontSize:11,color:"#aaa"}},`${bd.w}mm`)),React.createElement("div",{style:{fontSize:11,color:"#888"}},bd.type)),
+              React.createElement("div",{style:{textAlign:"right"}},React.createElement("div",{style:{fontSize:13,fontWeight:600}},"$",bd.price.toFixed(2),"/lm"),React.createElement("div",{style:{fontSize:10,color:bd.real?"#4a9e4a":"#aaa"}},bd.real?"Bunnings":"Estimate")));})
+          )),
+          React.createElement("div",{style:{background:"#FFF9E6",borderRadius:10,padding:10,marginTop:4,fontSize:12,color:"#666",borderLeft:`3px solid ${Y}`}},React.createElement("b",null,"Jeff: "),jeffFixNote(form.deckingType||"merbau"))
+        )),
+        card(React.createElement("div",null,
+          React.createElement("div",{style:{fontSize:13,fontWeight:500,marginBottom:8}},"Balustrade"),
+          React.createElement("div",{style:{display:"flex",flexWrap:"wrap",gap:6,marginBottom:8}},
+            balStyles.map(({key,label})=>React.createElement("button",{key,style:{padding:"6px 12px",borderRadius:20,border:`1.5px solid ${form.balustradeType===key?Y:BD}`,background:form.balustradeType===key?"#FFF9E6":"white",fontSize:12,fontWeight:form.balustradeType===key?700:400},onClick:()=>upd("balustradeType",key)},label))
+          ),
+          form.balustradeType!=="none"&&React.createElement("div",null,
+            React.createElement("div",{style:{display:"flex",alignItems:"center",gap:8,marginTop:8}},
+              React.createElement("input",{type:"checkbox",checked:form.poolAdjacent,onChange:e=>upd("poolAdjacent",e.target.checked),id:"pool",style:{width:16,height:16}}),
+              React.createElement("label",{htmlFor:"pool",style:{fontSize:13,color:"#555"}},"Adjacent to pool or spa (AS1926.1 rules apply)")
+            ),
+            form.poolAdjacent&&React.createElement("div",{style:{background:"#FEF2F2",borderRadius:8,padding:8,marginTop:8,fontSize:12,color:"#991B1B"}},"⚠ Pool fence rules apply — height set to 1200mm min. Wire infill not permitted without glazing.")
+          )
+        )),
+        card(React.createElement("div",null,
+          React.createElement("div",{style:{fontSize:13,fontWeight:500,marginBottom:8}},"Stairs"),
+          React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7,marginBottom:form.stairType!=="none"?10:0}},
+            [["none","No stairs"],["standard","Standard"],["wide","Wide"],["landing","With landing"]].map(([k,l])=>React.createElement("button",{key:k,style:{padding:"10px",borderRadius:11,border:form.stairType===k?`2px solid ${Y}`:`1px solid ${BD}`,background:form.stairType===k?"#FFF9E6":"white",fontSize:13,fontWeight:form.stairType===k?700:400},onClick:()=>{upd("stairType",k);if(k==="none")upd("stairWidthMm",0);else if(!form.stairWidthMm)upd("stairWidthMm",1200);}},l))
+          ),
+          form.stairType!=="none"&&React.createElement("div",{style:{display:"flex",gap:8,alignItems:"center"}},
+            React.createElement("button",{style:{width:38,height:38,border:`1px solid ${BD}`,borderRadius:9,fontSize:18,background:"white"},onClick:()=>upd("stairWidthMm",Math.max(900,Number(form.stairWidthMm)-100))},"-"),
+            React.createElement("div",{style:{flex:1,textAlign:"center",fontWeight:600}},form.stairWidthMm||1200," mm wide"),
+            React.createElement("button",{style:{width:38,height:38,border:`1px solid ${BD}`,borderRadius:9,fontSize:18,background:"white"},onClick:()=>upd("stairWidthMm",(Number(form.stairWidthMm)||1200)+100)},"+")
+          )
+        )),
+        React.createElement(PBtn,{label:"See my deck layout →",onClick:()=>go(3)}),
+        React.createElement(BackBtn,null)
+      ),
+
+      // ── SCREEN 4: Layout plan ──────────────────────────────────
+      screen===4&&React.createElement("div",null,
+        jeff(`${form.name?"Your ":""}${form.length}m × ${form.width}m ${form.projectType||"deck"}`),
+        React.createElement("div",{style:{fontSize:13,color:"#666",marginBottom:10}},"Here's how Jeff sees your project. Adjust the layout below."),
+        card(React.createElement("div",null,
+          React.createElement("svg",{width:"100%",viewBox:`0 0 300 220`,style:{display:"block",background:"#fafafa",borderRadius:8,marginBottom:10}},
+            React.createElement("defs",null,React.createElement("clipPath",{id:"dc"},React.createElement("rect",{x:40,y:30,width:220,height:160}))),
+            React.createElement("rect",{x:40,y:30,width:220,height:160,fill:"#F5EFD8",stroke:"#111",strokeWidth:2}),
+            ...(()=>{
+              const bw=BOARDS[form.deckingType||"merbau"].w;
+              const L=parseFloat(form.length)||5,D=parseFloat(form.width)||4;
+              const scX=220/L,scY=160/D;
+              const centresPx=(bw+6)/1000*(form.layoutBoard==="EW"?scY:scX);
+              const lines=[];
+              if(form.layoutBoard==="EW"){for(let y=30+centresPx;y<190;y+=centresPx)lines.push(React.createElement("line",{key:y,x1:40,y1:y,x2:260,y2:y,stroke:"#C8BC9A",strokeWidth:Math.max(1,centresPx*0.55),clipPath:"url(#dc)"}));}
+              else{for(let x=40+centresPx;x<260;x+=centresPx)lines.push(React.createElement("line",{key:x,x1:x,y1:30,x2:x,y2:190,stroke:"#C8BC9A",strokeWidth:Math.max(1,centresPx*0.55),clipPath:"url(#dc)"}));}
+              return lines;
+            })(),
+            React.createElement("rect",{x:40,y:30,width:220,height:160,fill:"none",stroke:"#111",strokeWidth:2}),
+            React.createElement("text",{x:150,y:24,textAnchor:"middle",fontSize:10,fill:"#aaa"},"N"),
+            React.createElement("text",{x:150,y:206,textAnchor:"middle",fontSize:10,fill:"#aaa"},"S"),
+            React.createElement("text",{x:34,y:112,textAnchor:"middle",fontSize:10,fill:"#aaa"},"W"),
+            React.createElement("text",{x:268,y:112,textAnchor:"middle",fontSize:10,fill:"#aaa"},"E"),
+            form.stairType!=="none"&&(()=>{
+              const stW=form.layoutStairsFull?220:Math.min((Number(form.stairWidthMm)||1200)/1000*(220/(parseFloat(form.length)||5)),220);
+              const sp=form.layoutStairs||"S";
+              const sx=40+(220-stW)/2,sh=20;
+              if(sp==="S")return React.createElement("rect",{x:sx,y:190,width:stW,height:sh,fill:Y,stroke:"#111",strokeWidth:1.5});
+              if(sp==="N")return React.createElement("rect",{x:sx,y:10,width:stW,height:sh,fill:Y,stroke:"#111",strokeWidth:1.5});
+              if(sp==="E")return React.createElement("rect",{x:260,y:30+(160-stW)/2,width:sh,height:stW,fill:Y,stroke:"#111",strokeWidth:1.5});
+              return React.createElement("rect",{x:20,y:30+(160-stW)/2,width:sh,height:stW,fill:Y,stroke:"#111",strokeWidth:1.5});
+            })(),
+            (form.placements||{}).bbq&&React.createElement("rect",{x:200,y:40,width:50,height:35,rx:4,fill:"#FFF0C0",stroke:"#E0A800",strokeWidth:1.5}),
+            (form.placements||{}).bbq&&React.createElement("text",{x:225,y:62,textAnchor:"middle",fontSize:9,fill:"#7A5800",fontWeight:"bold"},"BBQ"),
+            (form.placements||{}).alfresco&&React.createElement("rect",{x:45,y:40,width:75,height:35,rx:4,fill:"#E0F4FF",stroke:"#4AABDE",strokeWidth:1.5}),
+            (form.placements||{}).alfresco&&React.createElement("text",{x:82,y:62,textAnchor:"middle",fontSize:9,fill:"#1A5F7A",fontWeight:"bold"},"Alfresco")
+          ),
+          React.createElement("div",{style:{fontSize:12,color:"#888",textAlign:"center",marginBottom:10}},`${BOARDS[form.deckingType||"merbau"].w}mm boards · ${form.length}m × ${form.width}m = ${est.area.toFixed(1)}m²`),
+          React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7}},
+            React.createElement("button",{style:{border:`1px solid ${BD}`,borderRadius:10,padding:"9px 10px",background:"white",fontSize:12,textAlign:"left"},onClick:()=>upd("layoutBoard",form.layoutBoard==="EW"?"NS":"EW")},React.createElement("div",{style:{fontSize:10,color:"#aaa",marginBottom:2}},"Board direction"),form.layoutBoard==="EW"?"← East–West →":"↑ North–South ↓"),
+            React.createElement("button",{style:{border:`1px solid ${BD}`,borderRadius:10,padding:"9px 10px",background:"white",fontSize:12,textAlign:"left"},onClick:()=>{const o=["N","E","S","W"];upd("layoutStairs",o[(o.indexOf(form.layoutStairs||"S")+1)%4]);}},React.createElement("div",{style:{fontSize:10,color:"#aaa",marginBottom:2}},"Stairs face"),{"N":"North","S":"South","E":"East","W":"West"}[form.layoutStairs||"S"]+" side"),
+            React.createElement("button",{style:{border:`1px solid ${BD}`,borderRadius:10,padding:"9px 10px",background:form.layoutStairsFull?"#FFF9E6":"white",fontSize:12,textAlign:"left"},onClick:()=>upd("layoutStairsFull",!form.layoutStairsFull)},React.createElement("div",{style:{fontSize:10,color:"#aaa",marginBottom:2}},"Stair width"),form.layoutStairsFull?"Full side length":"Custom width"),
+            React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:5}},
+              [["bbq","BBQ zone","#FFF0C0","#E0A800"],["alfresco","Alfresco","#E0F4FF","#4AABDE"]].map(([k,l,bg,br])=>React.createElement("button",{key:k,style:{border:`1px solid ${(form.placements||{})[k]?br:BD}`,borderRadius:8,padding:"6px 8px",background:(form.placements||{})[k]?bg:"white",fontSize:11,textAlign:"left",fontWeight:(form.placements||{})[k]?700:400},onClick:()=>{const cur=(form.placements||{})[k];upd("placements",{...(form.placements||{}),[k]:cur?null:{x:0,y:0}});}},
+                (form.placements||{})[k]?`Remove ${l}`:`+ ${l}`))
+            )
+          )
+        )),
+        React.createElement("div",{style:{background:"white",borderRadius:12,border:`1px solid ${BD}`,padding:12,marginBottom:12,fontSize:12,color:"#666",lineHeight:1.6,borderLeft:`3px solid ${Y}`}},
+          React.createElement("b",{style:{color:TX}},"Jeff's read: "),
+          `${form.deckLevel==="raised"?"Raised "+form.heightMm+"mm":"Ground level"} · ${form.siteCondition==="flat"?"Flat site":"Site needs levelling"} · ${BOARDS[form.deckingType||"merbau"].label} ${BOARDS[form.deckingType||"merbau"].w}mm boards · ${form.stairType==="none"?"No stairs":"Stairs facing "+{"N":"north","S":"south","E":"east","W":"west"}[form.layoutStairs||"S"]}${(form.placements||{}).bbq?" · BBQ zone":""}${(form.placements||{}).alfresco?" · Alfresco kitchen":""}${form.balustradeType!=="none"?" · "+balStyles.find(b=>b.key===form.balustradeType)?.label+" balustrade":""}`
+        ),
+        React.createElement(PBtn,{label:"See the render →",onClick:()=>setScreen(5)}),
+        React.createElement(BackBtn,null)
+      ),
+
+      // ── SCREEN 5: Cutaway render ───────────────────────────────
+      screen===5&&React.createElement("div",null,
+        jeff("Here's your project"),
+        React.createElement("div",{style:{fontSize:13,color:"#666",marginBottom:10}},"A cutaway view showing your structure from footings up. Jeff has applied all the right specs for your choices."),
+        card(React.createElement(CutawayRender,{form})),
+        React.createElement("div",{style:{background:"white",borderRadius:12,border:`1px solid ${BD}`,padding:12,marginBottom:12,fontSize:12,color:"#666",lineHeight:1.7}},
+          React.createElement("b",{style:{color:TX}},"Structural specs: "),
+          `${rules.nFootings} footings · ${rules.maxSpX}m×1.2m grid · Joists ${rules.joistLabel}`,
+          rules.high&&React.createElement("span",{style:{color:"#C04040"}}," · ⚠ >1800mm — upgraded specs"),
+          rules.dblBearer&&React.createElement("span",{style:{color:"#2060C0"}}," · Double bearer all sides (balustrade)")
+        ),
+        React.createElement(PBtn,{label:"See my estimate →",onClick:()=>setScreen(6)}),
+        React.createElement(BackBtn,null)
+      ),
+
+      // ── SCREEN 6: Estimate ─────────────────────────────────────
+      screen===6&&React.createElement("div",null,
+        jeff("Your estimate"),
+        card(React.createElement("div",{style:{textAlign:"center"}},
+          React.createElement("div",{style:{fontSize:12,color:"#aaa",marginBottom:4}},"Budget estimate — materials + labour"),
+          React.createElement("div",{style:{fontSize:42,fontWeight:700,color:TX}},"$",Math.round(est.total).toLocaleString()),
+          React.createElement("div",{style:{fontSize:13,color:"#888",marginTop:4}},"$",Math.round(est.ratePerM2),"/m² · ",est.area.toFixed(1)," m²")
+        )),
+        card(React.createElement("div",null,
+          React.createElement("div",{style:{fontSize:13,fontWeight:600,marginBottom:12}},"How we got there — real Bunnings rates where available"),
+          est.cats.map(cat=>React.createElement("div",{key:cat,style:{marginBottom:14}},
+            React.createElement("div",{style:{fontSize:11,fontWeight:600,color:"#aaa",textTransform:"uppercase",letterSpacing:1,marginBottom:4}},cat),
+            est.items.filter(i=>i.cat===cat).map(i=>React.createElement("div",{key:i.label,style:{display:"flex",justifyContent:"space-between",fontSize:13,padding:"3px 0",borderBottom:"1px solid #f5f5f5"}},
+              React.createElement("span",{style:{color:"#555",flex:1,paddingRight:8}},i.label,i.note?React.createElement("span",{style:{fontSize:10,color:"#bbb",marginLeft:4}},i.note):""),
+              React.createElement("span",{style:{fontWeight:500}},"$",Math.round((i.qty||0)*(i.rate||0)).toLocaleString())
+            ))
+          )),
+          React.createElement("div",{style:{borderTop:`2px solid ${TX}`,paddingTop:8,display:"flex",justifyContent:"space-between",alignItems:"baseline"}},
+            React.createElement("span",{style:{fontSize:13,color:"#888"}},"$",Math.round(est.ratePerM2),"/m²"),
+            React.createElement("span",{style:{fontSize:32,fontWeight:700}},"$",Math.round(est.total).toLocaleString())
+          ),
+          React.createElement("div",{style:{fontSize:11,color:"#bbb",marginTop:6}},"Merbau priced from Bunnings. Other boards are indicative — live pricing coming soon.")
+        )),
+        card(React.createElement("div",null,
+          React.createElement("div",{style:{fontSize:13,fontWeight:600,marginBottom:12}},"Unlock your full project report"),
+          [["Itemised live pricing","Current material & labour rates for your area"],["Materials shopping list","Ready to email or print to your supplier"],["Photo-realistic render","Save or print an image of your build"],["Build guide access","Full technical library for 14 days"]].map(([t,d])=>React.createElement("div",{key:t,style:{display:"flex",gap:12,marginBottom:10,alignItems:"flex-start"}},
+            React.createElement("div",{style:{width:28,height:28,borderRadius:14,background:Y,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:12,fontWeight:700}},"✓"),
+            React.createElement("div",null,React.createElement("div",{style:{fontSize:14,fontWeight:500}},t),React.createElement("div",{style:{fontSize:12,color:"#888"}},d))
+          ))
+        )),
+        React.createElement("button",{style:{width:"100%",height:54,borderRadius:14,fontWeight:700,fontSize:17,background:Y,border:"none",marginBottom:8}},"Unlock full project — $21"),
+        React.createElement("button",{style:{width:"100%",height:42,borderRadius:12,fontWeight:500,fontSize:14,background:"white",border:`1px solid ${BD}`,color:"#555",marginBottom:8}},"Save and come back later"),
+        React.createElement("button",{onClick:()=>setScreen(1),style:{background:"none",border:"none",fontSize:13,color:"#aaa",textDecoration:"underline",display:"block",margin:"0 auto"}},"Start over"),
+        React.createElement(BackBtn,null)
+      )
+    )
+  );
+}
+
+ReactDOM.render(React.createElement(App),document.getElementById("root"));
+</script>
+</body>
+</html>

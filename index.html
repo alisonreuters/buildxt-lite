@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>BuildXT Lite</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#F7F7F7;min-height:100vh;}
+input,textarea,button,select{font-family:inherit;}
+button{cursor:pointer;}
+textarea{resize:vertical;}
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+.spin{animation:spin 1s linear infinite;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.fade{animation:fadeIn 0.3s ease;}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+const {useState,useMemo,useEffect,useCallback}=React;
+const Y="#F2B705",BG="#F7F7F7",TX="#1A1A1A",BD="#E5E5E5";
+
+const SB=supabase.createClient(
+  "https://jeyjietwsaormgmtcdiz.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpleWppZXR3c2Fvcm1nbXRjZGl6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1NDQ4MTMsImV4cCI6MjA5MDEyMDgxM30.b3-dh7_yOke_dcVmqXynRycL7d2beBhWmf5oy8pUARg"
+);
+
+// Wind regions by postcode range (simplified Australian regions)
+function getWindRegion(pc){
+  const n=parseInt(pc);
+  if(!n)return{region:"N3",terrain:"TC2",desc:"Standard suburban"};
+  // QLD coastal
+  if(n>=4000&&n<=4299)return{region:"C",terrain:"TC2",desc:"Queensland coastal — cyclonic zone"};
+  if(n>=4300&&n<=4999)return{region:"B",terrain:"TC2",desc:"Queensland inland"};
+  // NSW coastal
+  if((n>=2000&&n<=2263)||(n>=2508&&n<=2530))return{region:"A4",terrain:"TC1",desc:"NSW coastal exposed"};
+  if(n>=2000&&n<=2999)return{region:"A3",terrain:"TC2",desc:"NSW suburban"};
+  // VIC
+  if(n>=3000&&n<=3999)return{region:"A3",terrain:"TC2",desc:"Victoria"};
+  // WA coastal
+  if(n>=6000&&n<=6214)return{region:"A5",terrain:"TC1",desc:"WA coastal"};
+  if(n>=6000&&n<=6999)return{region:"A3",terrain:"TC2",desc:"WA inland"};
+  // SA
+  if(n>=5000&&n<=5999)return{region:"A3",terrain:"TC2",desc:"South Australia"};
+  // NT
+  if(n>=800&&n<=999)return{region:"C",terrain:"TC1",desc:"Northern Territory — cyclonic zone"};
+  // TAS
+  if(n>=7000&&n<=7999)return{region:"A4",terrain:"TC2",desc:"Tasmania"};
+  return{region:"A3",terrain:"TC2",desc:"Standard suburban"};
+}
+
+const BOARDS={
+  merbau:     {label:"Merbau",w:90, gap:6,type:"hardwood", price:5.52,real:true, color:"#7B3410"},
+  spotted_gum:{label:"Spotted Gum",w:90,gap:6,type:"hardwood",price:8.50,real:false,color:"#C4956A"},
+  blue_gum:   {label:"Blue Gum",w:90, gap:6,type:"hardwood", price:8.20,real:false,color:"#8FAF80"},
+  pine_budget:{label:"Pine (grooved)",w:90,gap:6,type:"pine",  price:3.80,real:false,color:"#DEB887"},
+  nextgen_140:{label:"NextGen 140",w:140,gap:5,type:"composite",price:18.50,real:false,color:"#7A8C98"},
+  nextgen_210:{label:"NextGen 210",w:210,gap:5,type:"composite",price:24.00,real:false,color:"#6A7C88"},
+  modclad:    {label:"Modclad",w:140,gap:5,type:"composite",price:17.00,real:false,color:"#8A9890"},
+};
+
+const FIXINGS={
+  hardwood: {label:"SS decking screws 14g×65mm",rate:34.95,unit:"PK",qtyPerLm:0.08},
+  pine:     {label:"Galv nails or SS screws",rate:18.00,unit:"PK",qtyPerLm:0.08},
+  composite:{label:"Hidden clip system",rate:2.80,unit:"EA",qtyPerLm:0.70},
+};
+
+const P={
+  concrete:8.69,unipier:55.0,post90_lm:27.5,
+  bearer140_lm:23.33,bearer_dbl_lm:46.67,
+  joist90_lm:8.45,joist140_lm:13.40,blocking_lm:8.45,
+  bolt_m12:2.86,nut_m12:0.38,washer_m12:0.85,
+  deck_oil:82.95,balustrade_lm:85.0,
+  stairs_base:450,stairs_per100mm:55,
+  sundries_base:95,sundries_m2:2.5,
+};
+
+function structRules(L,D,hmm,hasBal,boardDir){
+  const high=hmm>1800;
+  const maxPostSpacing=high?1.5:1.8; // max post spacing along bearer
+  const maxBearerSpan=1.2;           // max bearer spacing (joist span)
+
+  // Board direction determines bearer/joist orientation:
+  // E-W boards → joists run N-S → bearers run E-W → posts along E-W at maxPostSpacing
+  // N-S boards → joists run E-W → bearers run N-S → posts along N-S at maxPostSpacing
+  const isEW=(boardDir||"EW")==="EW";
+
+  // Bearer rows: perpendicular to bearers, spaced at maxBearerSpan
+  // Post rows along bearer: spaced at maxPostSpacing
+  const nBearerRows= isEW ? Math.ceil(D/maxBearerSpan)+1 : Math.ceil(L/maxBearerSpan)+1;
+  const nPostsPerBearer= isEW ? Math.ceil(L/maxPostSpacing)+1 : Math.ceil(D/maxPostSpacing)+1;
+
+  // Bearer positions (across deck, perpendicular to board direction)
+  const bearerPositions=Array.from({length:nBearerRows},(_,i)=>
+    isEW ? i*(D/Math.max(1,nBearerRows-1)) : i*(L/Math.max(1,nBearerRows-1))
+  );
+  // Post positions along each bearer
+  const postPositions=Array.from({length:nPostsPerBearer},(_,i)=>
+    isEW ? i*(L/Math.max(1,nPostsPerBearer-1)) : i*(D/Math.max(1,nPostsPerBearer-1))
+  );
+
+  const nFootings=nBearerRows*nPostsPerBearer;
+
+  // Bearer lengths: perimeter bearers + internal bearers
+  // Perimeter = 4 sides. Internal = (nBearerRows-2) rows
+  const bearerRunLength=isEW?L:D;
+  const perimBearerLm=bearerRunLength*4; // 4 perimeter sides (approx — 2 long + 2 short)
+  const internalBearerLm=bearerRunLength*Math.max(0,nBearerRows-2);
+  // Double perimeter bearers if balustrade, single internal
+  const totalBearerLm=Math.ceil((hasBal?perimBearerLm*2:perimBearerLm)+internalBearerLm);
+
+  // Joist length and count
+  const joistSpan=isEW?D:L;       // joists span perpendicular to boards
+  const joistRun=isEW?L:D;        // joists spaced along board direction
+  const nJoists=Math.ceil(joistRun/0.45)+1;
+  const joistLmTotal=Math.ceil(nJoists*joistSpan);
+
+  const nSteps=hmm>0?Math.ceil(hmm/180):0;
+  const riser=nSteps>0?Math.round(hmm/nSteps):160;
+
+  return{
+    nBearerRows,nPostsPerBearer,bearerPositions,postPositions,
+    joistLm:P[high?"joist140_lm":"joist90_lm"],
+    joistLabel:high?"140×45":"90×45",
+    joistLmTotal,totalBearerLm,
+    bearerRunLength,isEW,
+    dblBearer:hasBal,high,maxPostSpacing,
+    nFootings,nSteps,riser,
+    bearerDesc:hasBal?"2/140×45 H4 perimeter (balustrade) + 140×45 internal":"140×45 H4 MGP10"
+  };
+}
+
+function calcEstimate(f){
+  const L=parseFloat(f.length)||5,D=parseFloat(f.width)||4,area=L*D;
+  const raised=f.deckLevel==="raised",hmm=Number(f.heightMm)||300;
+  const bk=f.deckingType||"merbau",board=BOARDS[bk];
+  const hasBal=f.balustradeType&&f.balustradeType!=="none";
+  const boardDir=f.layoutBoard||"EW";
+  const rules=structRules(L,D,hmm,hasBal,boardDir);
+  const {nFootings,joistLm,joistLmTotal,totalBearerLm,isEW,dblBearer,nPostsPerBearer,nBearerRows}=rules;
+
+  const boardCentres=(board.w+board.gap)/1000;
+  const deckingLm=Math.ceil(area/boardCentres*1.10);
+
+  const perimLm=(L+D)*2;
+  // Blocking: rows perpendicular to joists at 1200mm
+  const joistSpan=isEW?D:L;
+  const joistRun=isEW?L:D;
+  const nJoists=Math.ceil(joistRun/0.45)+1;
+  const blockingRows=Math.floor(joistSpan/1.2);
+  const blockingLm=Math.ceil(blockingRows*nJoists*0.09);
+
+  const nPosts=nFootings;
+  const postHm=raised?(hmm/1000)+0.3:0.3;
+  const totalBolts=nPosts*2+nJoists*2;
+
+  const fixing=FIXINGS[board.type];
+  const fixingQty=Math.ceil(deckingLm*fixing.qtyPerLm);
+  const oilCans=board.type!=="composite"?Math.ceil(area/12):0;
+
+  const stairW=Math.min(Number(f.stairWidthMm)||1200,L*1000);
+  const stairCost=f.stairType==="none"?0:P.stairs_base+Math.max(0,(stairW-1200)/100)*P.stairs_per100mm;
+  const balPerim=hasBal?Math.ceil(perimLm*0.6):0;
+
+  // Bearer line items — split perimeter (double if balustrade) and internal
+  const bearerRunLen=isEW?L:D;
+  const perimBearerLm=Math.ceil(bearerRunLen*4);
+  const internalBearerLm=Math.ceil(bearerRunLen*Math.max(0,nBearerRows-2));
+
+  const items=[
+    {cat:"Footings",label:"Concrete footing bags 20kg",qty:nFootings*3,unit:"EA",rate:P.concrete,note:`${nFootings} footings · ${nBearerRows} rows × ${nPostsPerBearer} posts`},
+    {cat:"Footings",label:"Uni-Pier adjustable post supports",qty:nPosts,unit:"EA",rate:P.unipier},
+    raised?{cat:"Footings",label:`Timber posts 90×90 H4 (${postHm.toFixed(1)}m ea)`,qty:Math.ceil(nPosts*postHm),unit:"LM",rate:P.post90_lm}:null,
+    hasBal?{cat:"Structure",label:"Perimeter bearers 2/140×45 H4 (dbl — balustrade load)",qty:perimBearerLm,unit:"LM",rate:P.bearer_dbl_lm}:
+           {cat:"Structure",label:"Bearers 140×45 H4 MGP10",qty:perimBearerLm+internalBearerLm,unit:"LM",rate:P.bearer140_lm},
+    hasBal&&internalBearerLm>0?{cat:"Structure",label:"Internal bearers 140×45 H4 MGP10",qty:internalBearerLm,unit:"LM",rate:P.bearer140_lm,note:"Single — internal rows"}:null,
+    {cat:"Structure",label:`Joists ${rules.joistLabel} H3 @ 450mm ctrs`,qty:joistLmTotal,unit:"LM",rate:joistLm,note:rules.high?"Upgraded >1800mm":`${nJoists} joists × ${joistSpan.toFixed(1)}m`},
+    {cat:"Structure",label:"Joist blocking 90×45 @ 1200mm",qty:blockingLm,unit:"LM",rate:P.blocking_lm},
+    {cat:"Fixings",label:"Structural bolts M12×120 HDG",qty:totalBolts,unit:"EA",rate:P.bolt_m12},
+    {cat:"Fixings",label:"Nuts M12 HDG",qty:totalBolts,unit:"EA",rate:P.nut_m12},
+    {cat:"Fixings",label:"Washers M12 galv sq",qty:totalBolts*2,unit:"EA",rate:P.washer_m12},
+    {cat:"Decking",label:`${board.label} ${board.w}×19 decking`,qty:deckingLm,unit:"LM",rate:board.price,note:`${area.toFixed(1)}m² · ${(1/boardCentres).toFixed(1)} boards/m`},
+    {cat:"Decking",label:fixing.label,qty:fixingQty,unit:fixing.unit,rate:fixing.rate},
+    oilCans>0?{cat:"Decking",label:"Decking oil 4L",qty:oilCans,unit:"EA",rate:P.deck_oil}:null,
+    f.stairType!=="none"?{cat:"Features",label:`Stairs — ${stairW}mm wide · ${rules.nSteps} risers @ ${rules.riser}mm`,qty:1,unit:"ITEM",rate:stairCost}:null,
+    balPerim>0?{cat:"Features",label:"Balustrade allowance",qty:balPerim,unit:"LM",rate:P.balustrade_lm,note:"~60% perimeter"}:null,
+    {cat:"Sundries",label:"Sundries & consumables",qty:1,unit:"ITEM",rate:P.sundries_base+area*P.sundries_m2},
+  ].filter(Boolean);
+
+  items.push({cat:"Labour",label:"Labour allowance",qty:Math.ceil(area),unit:"m²",rate:raised?72:55,note:"Indicative"});
+  const total=items.reduce((s,i)=>s+(i.qty||0)*(i.rate||0),0);
+  return{items,total,area,cats:[...new Set(items.map(i=>i.cat))],ratePerM2:area>0?total/area:0,rules};
+}
+
+function jeffFixNote(bk){
+  if(BOARDS[bk].type==="composite")return`${BOARDS[bk].label} uses hidden clips — no face screws. Included.`;
+  if(bk==="merbau")return"Merbau bleeds tannins — SS screws essential. Galv nails would stain your deck.";
+  if(bk==="spotted_gum"||bk==="blue_gum")return`${BOARDS[bk].label} is very hard — pre-drilling essential. SS screws specced.`;
+  return"Galv nails work fine on pine — or upgrade to SS for longevity.";
+}
+
+// Pick best render image based on user choices
+function getRenderImage(form){
+  const hasStairs=form.stairType!=="none";
+  const hasBal=form.balustradeType&&form.balustradeType!=="none";
+  // Image 1: balustrade, no prominent stairs = render-deck-balustrade.jpg
+  // Image 3: stairs prominent, raised = render-deck-stairs.png
+  if(hasStairs&&form.deckLevel==="raised") return{src:"render-deck-stairs.png",type:"png"};
+  if(hasBal) return{src:"render-deck-balustrade.jpg",type:"jpg"};
+  if(hasStairs) return{src:"render-deck-stairs.png",type:"png"};
+  return{src:"render-deck-balustrade.jpg",type:"jpg"};
+}
+
+function App(){
+  const [screen,setScreen]=useState(1);
+  const [user,setUser]=useState(null);
+  const [projects,setProjects]=useState([]);
+  const [saveEmail,setSaveEmail]=useState("");
+  const [saveName,setSaveName]=useState("");
+  const [saveState,setSaveState]=useState("idle"); // idle|asking|sending|sent
+  const [form,setForm]=useState({
+    postcode:"",projectType:"Deck",description:"",
+    length:"5.0",width:"4.0",siteCondition:"",deckLevel:"ground",
+    heightMm:800,layoutBoard:"EW",layoutStairs:"S",layoutStairsFull:false,
+    deckingType:"merbau",stairType:"standard",stairWidthMm:1200,
+    balustradeType:"none",poolAdjacent:false,
+    placements:{bbq:null,alfresco:null}
+  });
+  const [errors,setErrors]=useState({});
+  const upd=(k,v)=>setForm(p=>({...p,[k]:v}));
+  const back=()=>{setErrors({});setScreen(s=>Math.max(1,s-1));};
+  const est=useMemo(()=>calcEstimate(form),[form]);
+  const wind=useMemo(()=>getWindRegion(form.postcode),[form.postcode]);
+  const render=useMemo(()=>getRenderImage(form),[form.stairType,form.deckLevel,form.balustradeType]);
+
+  useEffect(()=>{
+    SB.auth.getSession().then(({data:{session}})=>{
+      if(session)setUser(session.user);
+    });
+    SB.auth.onAuthStateChange((_,session)=>{
+      setUser(session?.user||null);
+      if(session?.user){
+        loadProjects(session.user.id);
+        if(saveState==="sending")setSaveState("sent");
+      }
+    });
+  },[]);
+
+  async function loadProjects(uid){
+    const{data}=await SB.from("projects").select("*").eq("user_id",uid).order("created_at",{ascending:false});
+    if(data)setProjects(data);
+  }
+
+  async function sendMagicLink(){
+    if(!saveEmail.trim()||!saveName.trim())return;
+    setSaveState("sending");
+    await SB.auth.signInWithOtp({
+      email:saveEmail,
+      options:{emailRedirectTo:"https://buildxt-lite.netlify.app",data:{first_name:saveName}}
+    });
+    // Also save project optimistically
+    if(user){
+      await SB.from("projects").insert({
+        user_id:user.id,name:`${saveName}'s ${form.projectType}`,
+        project_type:form.projectType,form_data:form,
+        estimate_total:Math.round(est.total),area:est.area,
+        created_at:new Date().toISOString()
+      });
+    }
+    setSaveState("sent");
+  }
+
+  const validate=(s)=>{
+    const e={};
+    if(s===1&&!/^\d{4}$/.test(form.postcode||""))e.postcode="Please enter a valid 4-digit postcode.";
+    if(s===3&&!form.siteCondition)e.siteCondition="Please select site condition.";
+    setErrors(e);return Object.keys(e).length===0;
+  };
+  const go=(s)=>{if(!validate(s))return;setScreen(x=>x+1);};
+
+  // Style helpers
+  const card=(ch,ex={})=>React.createElement("div",{style:{background:"white",borderRadius:16,border:`1px solid ${BD}`,padding:16,marginBottom:12,...ex}},ch);
+  const PBtn=({label,onClick,sub,disabled=false,dark=false})=>React.createElement("button",{onClick,disabled,
+    style:{width:"100%",height:sub?56:50,borderRadius:12,fontWeight:700,fontSize:16,
+      background:disabled?"#ddd":dark?"#1A1A1A":Y,color:dark?"white":TX,
+      border:"none",marginBottom:8,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:2}},
+    React.createElement("span",null,label),
+    sub&&React.createElement("span",{style:{fontSize:11,fontWeight:400,opacity:0.75}},sub)
+  );
+  const BackBtn=()=>screen>1?React.createElement("button",{onClick:back,style:{background:"none",border:"none",fontSize:14,fontWeight:600,textDecoration:"underline",padding:"4px 0",display:"block",color:TX}},"← Back"):null;
+  const Err=(k)=>errors[k]?React.createElement("div",{style:{fontSize:12,color:"#e53e3e",marginBottom:6,marginTop:2}},errors[k]):null;
+  const dots=()=>React.createElement("div",{style:{display:"flex",justifyContent:"center",gap:6,padding:"6px 0 10px"}},
+    Array.from({length:6},(_,i)=>React.createElement("div",{key:i,style:{width:i+1===screen?20:8,height:8,borderRadius:4,background:i+1===screen?Y:BD,transition:"all 0.3s"}})));
+  const T=(active,onClick,label)=>React.createElement("button",{onClick,style:{padding:"6px 13px",borderRadius:20,border:`1.5px solid ${active?Y:BD}`,background:active?"#FFF9E6":"white",fontSize:12,fontWeight:active?700:400,marginBottom:4}},label);
+  const jeff=(t,sub)=>React.createElement("div",{style:{marginBottom:14},className:"fade"},
+    React.createElement("div",{style:{fontSize:20,fontWeight:600,lineHeight:1.35,color:TX}},t),
+    sub&&React.createElement("div",{style:{fontSize:13,color:"#777",marginTop:5,lineHeight:1.5}},sub)
+  );
+  const warn=(msg,color="#991B1B",bg="#FEF2F2")=>React.createElement("div",{style:{background:bg,borderRadius:10,padding:"10px 14px",marginBottom:10,fontSize:12,color,display:"flex",gap:8,alignItems:"flex-start",lineHeight:1.5}},
+    React.createElement("span",{style:{flexShrink:0}},"⚠"),msg);
+
+  const boardGroups=[
+    {group:"Hardwood",keys:["merbau","spotted_gum","blue_gum"]},
+    {group:"Composite",keys:["nextgen_140","nextgen_210","modclad"]},
+    {group:"Budget",keys:["pine_budget"]},
+  ];
+  const balStyles=[
+    {key:"none",label:"No"},
+    {key:"madison",label:"Madison"},
+    {key:"santa_rosa",label:"Santa Rosa"},
+    {key:"antigua",label:"Antigua (glass)"},
+    {key:"martinique",label:"Martinique"},
+    {key:"wire",label:"Wire tension"},
+    {key:"rendered",label:"Rendered panel"},
+  ];
+  const PROJECT_TYPES=["Deck","Pergola","Cabana","Gazebo","Shed","Carport","Garage","Extension","Renovation"];
+
+  return React.createElement("div",{style:{background:BG,minHeight:"100vh"}},
+    React.createElement("div",{style:{maxWidth:440,margin:"0 auto",padding:"0 16px 48px"}},
+
+      // Header
+      React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"14px 0 2px"}},
+        React.createElement("div",{style:{fontSize:22,fontWeight:700,color:TX}},"BUILD",React.createElement("span",{style:{color:Y}},"XT")),
+        screen>=2&&React.createElement("div",{style:{fontSize:11,background:"white",padding:"4px 12px",borderRadius:20,border:`1px solid ${BD}`,color:"#888"}},
+          form.postcode&&wind?`${form.postcode} · Wind ${wind.region} · ${wind.terrain}`:"")
+      ),
+      dots(),
+
+      // ── SCREEN 1: Jeff says Hi ──────────────────────────────────
+      screen===1&&React.createElement("div",{className:"fade"},
+        React.createElement("div",{style:{textAlign:"center",padding:"20px 0 16px"}},
+          React.createElement("div",{style:{width:64,height:64,borderRadius:32,background:Y,margin:"0 auto 12px",display:"flex",alignItems:"center",justifyContent:"center",fontSize:28}},"🏗"),
+          React.createElement("div",{style:{fontSize:24,fontWeight:700,color:TX,marginBottom:6}},"Hi — I'm Jeff"),
+          React.createElement("div",{style:{fontSize:15,color:"#666",lineHeight:1.6,maxWidth:300,margin:"0 auto"}},"I'll help you design and cost your next build. Takes about 2 minutes.")
+        ),
+        card(React.createElement("div",null,
+          React.createElement("label",{style:{fontSize:13,fontWeight:500,display:"block",marginBottom:6}},"What's your postcode?"),
+          React.createElement("input",{value:form.postcode,onChange:e=>upd("postcode",e.target.value.replace(/\D/g,"").slice(0,4)),
+            placeholder:"e.g. 2095",inputMode:"numeric",autoFocus:true,
+            style:{width:"100%",height:52,border:`1.5px solid ${BD}`,borderRadius:12,padding:"0 16px",fontSize:18,fontWeight:600,textAlign:"center",letterSpacing:4,marginBottom:4}}),
+          React.createElement("div",{style:{fontSize:12,color:"#888",textAlign:"center",lineHeight:1.5,marginTop:6}},
+            "I use this to check wind region and terrain category for your area — it affects how your structure needs to be built."),
+          Err("postcode"),
+          form.postcode&&form.postcode.length===4&&React.createElement("div",{style:{marginTop:10,padding:"8px 12px",background:"#F0FDF4",borderRadius:8,fontSize:12,color:"#166534",display:"flex",gap:6,alignItems:"center"}},
+            "✓ ",React.createElement("span",null,React.createElement("b",null,wind.region," · ",wind.terrain)," — ",wind.desc))
+        )),
+        React.createElement(PBtn,{label:"Let's go →",onClick:()=>go(1)})
+      ),
+
+      // ── SCREEN 2: What are you building ────────────────────────
+      screen===2&&React.createElement("div",{className:"fade"},
+        jeff("What are you building?","Select a project type, describe what you have in mind, and tell me the size."),
+        card(React.createElement("div",null,
+          React.createElement("div",{style:{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:7,marginBottom:14}},
+            PROJECT_TYPES.map(p=>React.createElement("button",{key:p,
+              style:{padding:"10px 4px",borderRadius:11,border:form.projectType===p?`2px solid ${Y}`:`1px solid ${BD}`,
+                background:form.projectType===p?"#FFF9E6":"white",fontSize:13,fontWeight:form.projectType===p?700:400},
+              onClick:()=>upd("projectType",p)},p))
+          ),
+          React.createElement("textarea",{value:form.description,onChange:e=>upd("description",e.target.value),
+            placeholder:`Describe your ${(form.projectType||"project").toLowerCase()} — style, features, anything specific...`,
+            style:{width:"100%",minHeight:72,border:`1px solid #111`,borderRadius:12,padding:10,fontSize:14,marginBottom:12}}),
+          React.createElement("div",{style:{fontSize:13,fontWeight:500,marginBottom:10}},"Dimensions"),
+          ["length","width"].map(k=>React.createElement("div",{key:k,style:{marginBottom:10}},
+            React.createElement("div",{style:{fontSize:12,color:"#888",marginBottom:4}},k==="length"?"Length":"Width"),
+            React.createElement("div",{style:{display:"flex",gap:8,alignItems:"center"}},
+              React.createElement("button",{style:{width:46,height:46,border:`1px solid ${BD}`,borderRadius:10,fontSize:22,background:"white"},
+                onClick:()=>upd(k,(Math.max(1,parseFloat(form[k]||0)-0.5)).toFixed(1))},"-"),
+              React.createElement("div",{style:{flex:1,textAlign:"center",fontSize:20,fontWeight:700}},form[k],"m"),
+              React.createElement("button",{style:{width:46,height:46,border:`1px solid ${BD}`,borderRadius:10,fontSize:22,background:"white"},
+                onClick:()=>upd(k,(parseFloat(form[k]||0)+0.5).toFixed(1))},"+")
+            )
+          )),
+          React.createElement("div",{style:{textAlign:"center",fontSize:13,color:"#777",marginTop:4}},
+            "Floor area: ",React.createElement("b",null,est.area.toFixed(1)," m²"))
+        )),
+        React.createElement(PBtn,{label:"Continue",onClick:()=>go(2)}),
+        React.createElement(BackBtn,null)
+      ),
+
+      // ── SCREEN 3: Site + Spec ───────────────────────────────────
+      screen===3&&React.createElement("div",{className:"fade"},
+        jeff("Tell me about the site and what you'd like"),
+        card(React.createElement("div",null,
+          React.createElement("div",{style:{fontSize:13,fontWeight:600,marginBottom:8,color:"#555"}},"Site conditions"),
+          React.createElement("div",{style:{display:"flex",gap:8,marginBottom:10}},
+            [["flat","Flat","No excavation needed"],["work","Needs work","Some levelling required"]].map(([v,l,s])=>
+              React.createElement("button",{key:v,style:{flex:1,padding:"12px 8px",borderRadius:12,border:form.siteCondition===v?`2px solid ${Y}`:`1px solid #ccc`,background:form.siteCondition===v?"#FFF9E6":"white",textAlign:"left"},onClick:()=>upd("siteCondition",v)},
+                React.createElement("div",{style:{fontSize:14,fontWeight:600}},l),
+                React.createElement("div",{style:{fontSize:11,color:"#888",marginTop:2}},s))
+            )
+          ),
+          Err("siteCondition"),
+          form.siteCondition==="work"&&warn("Site levelling costs are not included — allow additional budget for excavation and prep."),
+          React.createElement("div",{style:{fontSize:13,fontWeight:600,marginBottom:8,color:"#555"}},"Deck level"),
+          React.createElement("div",{style:{display:"flex",gap:8,marginBottom:form.deckLevel==="raised"?10:0}},
+            [["ground","Ground level","Pad footings + bearer supports"],["raised","Raised","Posts, footings + bracing"]].map(([v,l,s])=>
+              React.createElement("button",{key:v,style:{flex:1,padding:"12px 8px",borderRadius:12,border:form.deckLevel===v?`2px solid ${Y}`:`1px solid #ccc`,background:form.deckLevel===v?"#FFF9E6":"white",textAlign:"left"},onClick:()=>upd("deckLevel",v)},
+                React.createElement("div",{style:{fontSize:14,fontWeight:600}},l),
+                React.createElement("div",{style:{fontSize:11,color:"#888",marginTop:2}},s))
+            )
+          ),
+          form.deckLevel==="ground"&&form.stairType==="none"&&React.createElement("div",{style:{background:"#FFF9E6",borderRadius:8,padding:"8px 10px",marginTop:8,marginBottom:4,fontSize:12,color:"#665500",display:"flex",gap:6,lineHeight:1.5}},
+            React.createElement("span",{style:{flexShrink:0}},"ⓘ"),
+            "Your deck sits 270mm above flat ground — I've allowed for one step in the estimate."
+          ),
+          form.deckLevel==="raised"&&React.createElement("div",{style:{background:"#FAFAFA",borderRadius:12,padding:12,marginTop:8}},
+            React.createElement("div",{style:{fontSize:13,fontWeight:600,marginBottom:8}},"Height above ground"),
+            React.createElement("div",{style:{display:"flex",gap:8,alignItems:"center"}},
+              React.createElement("button",{style:{width:44,height:44,border:`1px solid ${BD}`,borderRadius:10,fontSize:22,background:"white"},onClick:()=>upd("heightMm",Math.max(200,Number(form.heightMm)-100))},"-"),
+              React.createElement("div",{style:{flex:1,textAlign:"center",fontWeight:700,fontSize:20}},form.heightMm,"mm"),
+              React.createElement("button",{style:{width:44,height:44,border:`1px solid ${BD}`,borderRadius:10,fontSize:22,background:"white"},onClick:()=>upd("heightMm",Number(form.heightMm)+100)},"+")
+            ),
+            React.createElement("div",{style:{fontSize:11,color:"#888",marginTop:8,textAlign:"center"}},
+              `${est.rules.nSteps} risers @ ${est.rules.riser}mm each · ${est.rules.high?"⚠ Upgraded specs required (>1800mm)":"Standard specs apply"}`),
+            Number(form.heightMm)>=1000&&form.balustradeType==="none"&&React.createElement("div",{style:{background:"#FEF2F2",borderRadius:8,padding:"8px 10px",marginTop:8,fontSize:12,color:"#991B1B",display:"flex",gap:6,lineHeight:1.5}},
+              React.createElement("span",{style:{flexShrink:0}},"⚠"),
+              "At this height a balustrade is required by the NCC. It is not included in your estimate — owner to supply and install to comply."
+            ),
+            Number(form.heightMm)>=730&&Number(form.heightMm)<1000&&form.balustradeType==="none"&&React.createElement("div",{style:{background:"#FFF9E6",borderRadius:8,padding:"8px 10px",marginTop:8,fontSize:12,color:"#665500",display:"flex",gap:6,lineHeight:1.5}},
+              React.createElement("span",{style:{flexShrink:0}},"ⓘ"),
+              "No balustrade included in estimate."
+            ),
+            Number(form.heightMm)>=270&&Number(form.heightMm)<730&&form.stairType==="none"&&React.createElement("div",{style:{background:"#FFF9E6",borderRadius:8,padding:"8px 10px",marginTop:8,fontSize:12,color:"#665500",display:"flex",gap:6,lineHeight:1.5}},
+              React.createElement("span",{style:{flexShrink:0}},"ⓘ"),
+              "I've allowed for stairs for this height."
+            ),
+            Number(form.heightMm)>=270&&Number(form.heightMm)<730&&form.stairType!=="none"&&React.createElement("div",{style:{background:"#F0FDF4",borderRadius:8,padding:"8px 10px",marginTop:8,fontSize:12,color:"#166534",display:"flex",gap:6,lineHeight:1.5}},
+              React.createElement("span",{style:{flexShrink:0}},"✓"),
+              "I've allowed for stairs in this design."
+            )
+          )
+        )),
+        card(React.createElement("div",null,
+          React.createElement("div",{style:{fontSize:13,fontWeight:600,marginBottom:10,color:"#555"}},"Decking board"),
+          boardGroups.map(({group,keys})=>React.createElement("div",{key:group,style:{marginBottom:12}},
+            React.createElement("div",{style:{fontSize:11,fontWeight:600,color:"#bbb",textTransform:"uppercase",letterSpacing:1,marginBottom:6}},group),
+            keys.map(k=>{const bd=BOARDS[k],sel=form.deckingType===k;
+              return React.createElement("button",{key:k,style:{width:"100%",padding:"10px 12px",borderRadius:11,border:sel?`2px solid ${Y}`:`1px solid ${BD}`,background:sel?"#FFF9E6":"white",textAlign:"left",display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5},onClick:()=>upd("deckingType",k)},
+                React.createElement("div",null,
+                  React.createElement("div",{style:{fontSize:13,fontWeight:sel?700:400}},bd.label," ",React.createElement("span",{style:{fontSize:11,color:"#aaa"}},`${bd.w}mm`)),
+                  React.createElement("div",{style:{fontSize:11,color:"#999"}},bd.type)),
+                React.createElement("div",{style:{textAlign:"right"}},
+                  React.createElement("div",{style:{fontSize:13,fontWeight:600}},"$",bd.price.toFixed(2),"/lm"),
+                  React.createElement("div",{style:{fontSize:10,color:bd.real?"#4a9e4a":"#bbb"}},bd.real?"Bunnings":"Estimate")));
+            })
+          )),
+          React.createElement("div",{style:{background:"#FFF9E6",borderRadius:10,padding:10,fontSize:12,color:"#665500",borderLeft:`3px solid ${Y}`,lineHeight:1.5}},
+            React.createElement("b",null,"Jeff: "),jeffFixNote(form.deckingType||"merbau"))
+        )),
+        card(React.createElement("div",null,
+          React.createElement("div",{style:{fontSize:13,fontWeight:600,marginBottom:8,color:"#555"}},"Balustrade"),
+          React.createElement("div",{style:{display:"flex",flexWrap:"wrap",gap:6,marginBottom:8}},
+            balStyles.map(({key,label})=>React.createElement("button",{key,style:{padding:"6px 12px",borderRadius:20,border:`1.5px solid ${form.balustradeType===key?Y:BD}`,background:form.balustradeType===key?"#FFF9E6":"white",fontSize:12,fontWeight:form.balustradeType===key?700:400},onClick:()=>upd("balustradeType",key)},label))
+          ),
+          form.balustradeType!=="none"&&React.createElement("div",null,
+            React.createElement("div",{style:{display:"flex",alignItems:"center",gap:8,marginTop:8}},
+              React.createElement("input",{type:"checkbox",checked:form.poolAdjacent,onChange:e=>upd("poolAdjacent",e.target.checked),id:"pool",style:{width:16,height:16}}),
+              React.createElement("label",{htmlFor:"pool",style:{fontSize:13,color:"#555"}},"Adjacent to pool or spa")
+            ),
+            form.poolAdjacent&&warn("Pool fence rules apply (AS1926.1) — 1200mm min height, self-closing gate required. Confirm with your certifier.")
+          )
+        )),
+        card(React.createElement("div",null,
+          React.createElement("div",{style:{fontSize:13,fontWeight:600,marginBottom:8,color:"#555"}},"Stairs"),
+          React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7,marginBottom:form.stairType!=="none"?10:0}},
+            [["none","No stairs"],["standard","Standard"],["wide","Wide"],["landing","With landing"]].map(([k,l])=>
+              React.createElement("button",{key:k,style:{padding:"10px",borderRadius:11,border:form.stairType===k?`2px solid ${Y}`:`1px solid ${BD}`,background:form.stairType===k?"#FFF9E6":"white",fontSize:13,fontWeight:form.stairType===k?700:400},
+                onClick:()=>{upd("stairType",k);if(k==="none")upd("stairWidthMm",0);else if(!form.stairWidthMm)upd("stairWidthMm",1200);}},l))
+          ),
+          form.stairType!=="none"&&React.createElement("div",null,
+            React.createElement("div",{style:{display:"flex",gap:8,alignItems:"center"}},
+              React.createElement("button",{style:{width:38,height:38,border:`1px solid ${BD}`,borderRadius:9,fontSize:18,background:"white"},onClick:()=>upd("stairWidthMm",Math.max(900,Number(form.stairWidthMm)-100))},"-"),
+              React.createElement("div",{style:{flex:1,textAlign:"center",fontWeight:700,fontSize:15}},Math.min(form.stairWidthMm||1200,parseFloat(form.length)*1000),"mm wide"),
+              React.createElement("button",{style:{width:38,height:38,border:`1px solid ${BD}`,borderRadius:9,fontSize:18,background:"white"},onClick:()=>upd("stairWidthMm",Math.min((Number(form.stairWidthMm)||1200)+100,parseFloat(form.length)*1000))},"+")
+            ),
+            React.createElement("div",{style:{fontSize:11,color:"#888",marginTop:6,textAlign:"center"}},
+              `${est.rules.nSteps} risers @ ${est.rules.riser}mm · 300mm going · max width ${Math.round(parseFloat(form.length)*1000)}mm`)
+          )
+        )),
+        React.createElement(PBtn,{label:"See my layout →",onClick:()=>go(3)}),
+        React.createElement(BackBtn,null)
+      ),
+
+      // ── SCREEN 4: Layout plan ───────────────────────────────────
+      screen===4&&React.createElement("div",{className:"fade"},
+        jeff(`Your ${form.length}m × ${form.width}m ${form.projectType}`,"Adjust the layout — board direction, stairs and features."),
+        card(React.createElement("div",null,
+          React.createElement("div",{style:{position:"relative",marginBottom:10}},React.createElement("svg",{width:"100%",viewBox:(()=>{
+              const L=parseFloat(form.length)||5,D=parseFloat(form.width)||4;
+              const ratio=L/D;
+              // Keep deck proportional — max 280px wide, scale height accordingly
+              const deckW=Math.min(280,Math.max(140,280));
+              const deckH=Math.min(200,Math.max(80,Math.round(deckW/ratio)));
+              const vw=deckW+60,vh=deckH+60;
+              return `0 0 ${vw} ${vh}`;
+            })(),style:{display:"block",background:"#FAFAFA",borderRadius:8}},
+            ...(()=>{
+              const L=parseFloat(form.length)||5,D=parseFloat(form.width)||4;
+              const ratio=L/D;
+              const deckW=Math.min(280,Math.max(140,280));
+              const deckH=Math.min(200,Math.max(80,Math.round(deckW/ratio)));
+              const vw=deckW+60,vh=deckH+60;
+              const ox=30,oy=30;
+              const bw=BOARDS[form.deckingType||"merbau"].w;
+              const scX=deckW/L,scY=deckH/D;
+              const centresPx=(bw+6)/1000*(form.layoutBoard==="EW"?scY:scX);
+              const lines=[
+                React.createElement("rect",{key:"bg",x:ox,y:oy,width:deckW,height:deckH,fill:"#F5EFD8",stroke:"#111",strokeWidth:2}),
+                React.createElement("defs",null,React.createElement("clipPath",{id:"dc"},React.createElement("rect",{x:ox,y:oy,width:deckW,height:deckH}))),
+              ];
+              if(form.layoutBoard==="EW"){for(let y=oy+centresPx;y<oy+deckH;y+=centresPx)lines.push(React.createElement("line",{key:y,x1:ox,y1:y,x2:ox+deckW,y2:y,stroke:"#C8BC9A",strokeWidth:Math.max(1.5,centresPx*0.55),clipPath:"url(#dc)"}));}
+              else{for(let x=ox+centresPx;x<ox+deckW;x+=centresPx)lines.push(React.createElement("line",{key:x,x1:x,y1:oy,x2:x,y2:oy+deckH,stroke:"#C8BC9A",strokeWidth:Math.max(1.5,centresPx*0.55),clipPath:"url(#dc)"}));}
+              lines.push(React.createElement("rect",{key:"border",x:ox,y:oy,width:deckW,height:deckH,fill:"none",stroke:"#111",strokeWidth:2}));
+              // Compass labels
+              lines.push(React.createElement("text",{key:"N",x:ox+deckW/2,y:oy-8,textAnchor:"middle",fontSize:10,fill:"#bbb"},"N"));
+              lines.push(React.createElement("text",{key:"S",x:ox+deckW/2,y:oy+deckH+16,textAnchor:"middle",fontSize:10,fill:"#bbb"},"S"));
+              lines.push(React.createElement("text",{key:"W",x:ox-10,y:oy+deckH/2+4,textAnchor:"middle",fontSize:10,fill:"#bbb"},"W"));
+              lines.push(React.createElement("text",{key:"E",x:ox+deckW+10,y:oy+deckH/2+4,textAnchor:"middle",fontSize:10,fill:"#bbb"},"E"));
+              // Dimension labels
+              lines.push(React.createElement("text",{key:"dimL",x:ox+deckW/2,y:oy+deckH+28,textAnchor:"middle",fontSize:9,fill:"#888"},`${form.length}m`));
+              lines.push(React.createElement("text",{key:"dimD",x:ox+deckW+24,y:oy+deckH/2+4,textAnchor:"middle",fontSize:9,fill:"#888",transform:`rotate(-90,${ox+deckW+24},${oy+deckH/2})`},`${form.width}m`));
+
+              // Stairs
+              if(form.stairType!=="none"){
+                const sp=form.layoutStairs||"S";
+                const isNS=sp==="S"||sp==="N";
+                const actualWmm=form.layoutStairsFull?(isNS?L*1000:D*1000):Math.min(Number(form.stairWidthMm)||1200,isNS?L*1000:D*1000);
+                const stWpx=isNS?Math.min(actualWmm/1000*scX,deckW-4):Math.min(actualWmm/1000*scY,deckH-4);
+                const stH=16;
+                const sxC=ox+(deckW-stWpx)/2, syC=oy+(deckH-stWpx)/2;
+                const coords={S:[sxC,oy+deckH,stWpx,stH],N:[sxC,oy-stH,stWpx,stH],E:[ox+deckW,syC,stH,stWpx],W:[ox-stH,syC,stH,stWpx]};
+                const[rx,ry,rw,rh]=coords[sp]||coords.S;
+                lines.push(React.createElement("rect",{key:"stair",x:rx,y:ry,width:rw,height:rh,fill:Y,stroke:"#111",strokeWidth:1.5,rx:2}));
+                if(isNS)lines.push(React.createElement("text",{key:"stairLabel",x:rx+rw/2,y:ry+11,textAnchor:"middle",fontSize:8,fill:"#555"},"stairs"));
+              }
+
+              // BBQ / Alfresco
+              if((form.placements||{}).bbq){
+                const bw2=Math.min(54,deckW*0.25),bh2=Math.min(38,deckH*0.3);
+                lines.push(React.createElement("rect",{key:"bbq",x:ox+deckW-bw2-4,y:oy+4,width:bw2,height:bh2,rx:4,fill:"#FFF0C0",stroke:"#E0A800",strokeWidth:1.5}));
+                lines.push(React.createElement("text",{key:"bbqL",x:ox+deckW-bw2/2-4,y:oy+bh2/2+8,textAnchor:"middle",fontSize:9,fill:"#7A5800",fontWeight:"bold"},"BBQ"));
+              }
+              if((form.placements||{}).alfresco){
+                const aw=Math.min(80,deckW*0.35),ah=Math.min(38,deckH*0.3);
+                lines.push(React.createElement("rect",{key:"alf",x:ox+4,y:oy+4,width:aw,height:ah,rx:4,fill:"#E0F4FF",stroke:"#4AABDE",strokeWidth:1.5}));
+                lines.push(React.createElement("text",{key:"alfL",x:ox+aw/2+4,y:oy+ah/2+8,textAnchor:"middle",fontSize:9,fill:"#1A5F7A",fontWeight:"bold"},"Alfresco"));
+              }
+              return lines;
+            })()
+          )),
+            form.stairType!=="none"&&(()=>{
+              const L=parseFloat(form.length)||5;
+              const D=parseFloat(form.width)||4;
+              const sp=form.layoutStairs||"S";
+              const isNS=sp==="S"||sp==="N";
+              // Actual stair width capped at deck dimension — matches estimate engine
+              const actualWmm=form.layoutStairsFull
+                ?(isNS?L*1000:D*1000)
+                :Math.min(Number(form.stairWidthMm)||1200, isNS?L*1000:D*1000);
+              // Scale to SVG proportionally: 220px=L, 160px=D
+              const stWpx=isNS
+                ?Math.min(actualWmm/1000*(220/L),218)
+                :Math.min(actualWmm/1000*(160/D),158);
+              const sx=40+(220-stWpx)/2;
+              const sy=30+(160-stWpx)/2;
+              const positions={
+                S:[sx,190,stWpx,18],
+                N:[sx,12,stWpx,18],
+                E:[260,sy,18,stWpx],
+                W:[22,sy,18,stWpx]
+              };
+              const[rx,ry,rw,rh]=positions[sp]||positions.S;
+              return React.createElement("g",null,
+                React.createElement("rect",{x:rx,y:ry,width:rw,height:rh,fill:Y,stroke:"#111",strokeWidth:1.5,rx:2}),
+                isNS&&React.createElement("text",{x:rx+rw/2,y:ry+11,textAnchor:"middle",fontSize:8,fill:"#555"},"stairs")
+              );
+            })(),
+            (form.placements||{}).bbq&&React.createElement("g",null,React.createElement("rect",{x:198,y:36,width:54,height:38,rx:4,fill:"#FFF0C0",stroke:"#E0A800",strokeWidth:1.5}),React.createElement("text",{x:225,y:59,textAnchor:"middle",fontSize:9,fill:"#7A5800",fontWeight:"bold"},"BBQ")),
+            (form.placements||{}).alfresco&&React.createElement("g",null,React.createElement("rect",{x:44,y:36,width:80,height:38,rx:4,fill:"#E0F4FF",stroke:"#4AABDE",strokeWidth:1.5}),React.createElement("text",{x:84,y:59,textAnchor:"middle",fontSize:9,fill:"#1A5F7A",fontWeight:"bold"},"Alfresco"))
+          ),
+          React.createElement("div",{style:{fontSize:12,color:"#888",textAlign:"center",marginBottom:12}},`${BOARDS[form.deckingType||"merbau"].w}mm ${BOARDS[form.deckingType||"merbau"].label} boards · ${est.area.toFixed(1)}m²`),
+          React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}},
+            React.createElement("button",{style:{border:`1px solid ${BD}`,borderRadius:10,padding:"10px",background:"white",fontSize:12,textAlign:"left"},onClick:()=>upd("layoutBoard",form.layoutBoard==="EW"?"NS":"EW")},
+              React.createElement("div",{style:{fontSize:10,color:"#aaa",marginBottom:2}},"Board direction"),form.layoutBoard==="EW"?"← E–W →":"↑ N–S ↓"),
+            React.createElement("button",{style:{border:`1px solid ${BD}`,borderRadius:10,padding:"10px",background:"white",fontSize:12,textAlign:"left"},onClick:()=>{const o=["N","E","S","W"];upd("layoutStairs",o[(o.indexOf(form.layoutStairs||"S")+1)%4]);}},
+              React.createElement("div",{style:{fontSize:10,color:"#aaa",marginBottom:2}},"Stairs face"),{"N":"North","S":"South","E":"East","W":"West"}[form.layoutStairs||"S"]+" side"),
+            React.createElement("button",{style:{border:`1px solid ${BD}`,borderRadius:10,padding:"10px",background:form.layoutStairsFull?"#FFF9E6":"white",fontSize:12,textAlign:"left"},onClick:()=>upd("layoutStairsFull",!form.layoutStairsFull)},
+              React.createElement("div",{style:{fontSize:10,color:"#aaa",marginBottom:2}},"Stair width"),form.layoutStairsFull?"Full side":"Custom"),
+            React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:5}},
+              [["bbq","BBQ zone","#FFF0C0","#E0A800"],["alfresco","Alfresco","#E0F4FF","#4AABDE"]].map(([k,l,bg,br])=>
+                React.createElement("button",{key:k,style:{border:`1px solid ${(form.placements||{})[k]?br:BD}`,borderRadius:8,padding:"7px 8px",background:(form.placements||{})[k]?bg:"white",fontSize:11,textAlign:"left",fontWeight:(form.placements||{})[k]?700:400},
+                  onClick:()=>{const cur=(form.placements||{})[k];upd("placements",{...(form.placements||{}),[k]:cur?null:{x:0,y:0}});}},
+                  (form.placements||{})[k]?`Remove ${l}`:`+ ${l}`))
+            )
+          )
+        )),
+        React.createElement("div",{style:{background:"white",borderRadius:12,border:`1px solid ${BD}`,padding:12,marginBottom:12,fontSize:12,color:"#666",lineHeight:1.6,borderLeft:`3px solid ${Y}`}},
+          React.createElement("b",{style:{color:TX}},"Jeff's read: "),
+          `${form.deckLevel==="raised"?"Raised "+form.heightMm+"mm · "+est.rules.nSteps+" risers @ "+est.rules.riser+"mm":"Ground level"} · ${form.siteCondition==="flat"?"Flat site":"Site needs levelling"} · ${BOARDS[form.deckingType||"merbau"].label} ${BOARDS[form.deckingType||"merbau"].w}mm · ${form.stairType==="none"?"No stairs":"Stairs "+{"N":"north","S":"south","E":"east","W":"west"}[form.layoutStairs||"S"]}${form.balustradeType!=="none"?" · "+form.balustradeType+" balustrade":""}`
+        ),
+        React.createElement(PBtn,{label:"See 3D set out →",onClick:()=>go(4)}),
+        React.createElement(BackBtn,null)
+      ),
+
+      // ── SCREEN 5: 3D Set out ────────────────────────────────────
+      screen===5&&React.createElement("div",{className:"fade"},
+        jeff("Your 3D set out"),
+        React.createElement("div",{style:{borderRadius:14,overflow:"hidden",marginBottom:12,background:"#111",position:"relative"}},
+          React.createElement("img",{src:render.src,alt:"3D set out of your deck",
+            style:{width:"100%",display:"block",borderRadius:14},
+            onError:e=>{e.target.style.display="none"}}),
+          React.createElement("div",{style:{position:"absolute",bottom:0,left:0,right:0,background:"linear-gradient(transparent,rgba(0,0,0,0.75))",padding:"20px 16px 12px"}}),
+          React.createElement("div",{style:{background:"#1A1A1A",padding:"10px 14px",display:"flex",flexWrap:"wrap",gap:6}},
+            [form.deckLevel==="raised"?`Raised ${form.heightMm}mm`:"Ground level",
+             `${BOARDS[form.deckingType||"merbau"].label} decking`,
+             form.stairType!=="none"?`${est.rules.nSteps} risers @ ${est.rules.riser}mm`:"No stairs",
+             form.balustradeType!=="none"?form.balustradeType+" balustrade":"Open deck"
+            ].map(tag=>React.createElement("div",{key:tag,style:{background:Y,color:TX,fontSize:11,fontWeight:600,padding:"3px 10px",borderRadius:20}},tag))
+          )
+        ),
+        form.siteCondition==="work"&&warn("Site levelling not included in estimate — allow additional budget."),
+        form.poolAdjacent&&warn("Pool fence rules apply (AS1926.1) — 1200mm min height, self-closing gate required."),
+        est.rules.high&&warn(`Deck height ${form.heightMm}mm exceeds 1800mm — upgraded to 140×45 joists and 1500mm post spacing.`,"#7C3500","#FFF7ED"),
+        React.createElement("div",{style:{background:"white",borderRadius:12,border:`1px solid ${BD}`,padding:12,marginBottom:12,fontSize:12,color:"#666",lineHeight:1.7}},
+          React.createElement("b",{style:{color:TX}},"Structure: "),
+          `${est.rules.nFootings} footings · ${est.rules.maxSpX}m×1.2m grid · ${est.rules.joistLabel} joists`,
+          est.rules.dblBearer&&React.createElement("span",{style:{color:"#2060C0"}}," · Double bearer (balustrade load)")
+        ),
+        React.createElement(PBtn,{label:"See my estimate →",onClick:()=>go(5)}),
+        React.createElement(BackBtn,null)
+      ),
+
+      // ── SCREEN 6: Estimate + Save ───────────────────────────────
+      screen===6&&React.createElement("div",{className:"fade"},
+        jeff("Your estimate"),
+        card(React.createElement("div",{style:{textAlign:"center"}},
+          React.createElement("div",{style:{fontSize:12,color:"#aaa",marginBottom:4}},"Budget estimate — materials + labour"),
+          React.createElement("div",{style:{fontSize:48,fontWeight:700,color:TX,letterSpacing:-2}},"$",Math.round(est.total).toLocaleString()),
+          React.createElement("div",{style:{fontSize:13,color:"#888",marginTop:4}},"$",Math.round(est.ratePerM2),"/m² · ",est.area.toFixed(1)," m²"),
+          React.createElement("div",{style:{fontSize:11,color:"#bbb",marginTop:4}},form.postcode," · Wind ",wind.region," · ",wind.terrain)
+        )),
+        card(React.createElement("div",null,
+          React.createElement("div",{style:{fontSize:13,fontWeight:600,marginBottom:12}},"Cost breakdown"),
+          est.cats.map(cat=>React.createElement("div",{key:cat,style:{marginBottom:14}},
+            React.createElement("div",{style:{fontSize:11,fontWeight:600,color:"#bbb",textTransform:"uppercase",letterSpacing:1,marginBottom:4}},cat),
+            est.items.filter(i=>i.cat===cat).map(i=>React.createElement("div",{key:i.label,style:{display:"flex",justifyContent:"space-between",fontSize:13,padding:"4px 0",borderBottom:"1px solid #f5f5f5"}},
+              React.createElement("span",{style:{color:"#555",flex:1,paddingRight:8}},i.label,i.note?React.createElement("span",{style:{fontSize:10,color:"#ccc",marginLeft:4}},i.note):""),
+              React.createElement("span",{style:{fontWeight:500}},"$",Math.round((i.qty||0)*(i.rate||0)).toLocaleString())
+            ))
+          )),
+          React.createElement("div",{style:{borderTop:`2px solid ${TX}`,paddingTop:8,display:"flex",justifyContent:"space-between",alignItems:"baseline"}},
+            React.createElement("span",{style:{fontSize:12,color:"#888"}},"$",Math.round(est.ratePerM2),"/m²"),
+            React.createElement("span",{style:{fontSize:34,fontWeight:700}},"$",Math.round(est.total).toLocaleString())
+          ),
+          React.createElement("div",{style:{fontSize:11,color:"#ccc",marginTop:6}},"Merbau priced from Bunnings. Other items indicative — live pricing coming soon."),
+          React.createElement("div",{style:{background:"#F7F7F7",borderRadius:8,padding:"10px 12px",marginTop:10,fontSize:11,color:"#888",lineHeight:1.6,borderLeft:"3px solid #E5E5E5"}},
+            React.createElement("b",{style:{color:"#666"}},"Note on quantities: "),
+            "Bearer and footing counts are calculated at nominal 1800mm centres from centreline out. Final quantities are subject to site set-out — edge bearer positions and exact spacings are confirmed on site. The $21 full report includes a detailed set-out calculation, exact bearer positions, blocking specification and a technical set-out guide you can take to site."
+          )
+        )),
+
+        // Unlock card
+        card(React.createElement("div",null,
+          React.createElement("div",{style:{fontSize:14,fontWeight:600,marginBottom:10}},"Unlock your full project report"),
+          [["Itemised live pricing","Current material & labour rates for your area"],
+           ["Materials shopping list","Print or email to your supplier"],
+           ["Full 3D set out render","Photorealistic cutaway of your build"],
+           ["Build guide access","Technical library for 14 days"]
+          ].map(([t,d])=>React.createElement("div",{key:t,style:{display:"flex",gap:10,marginBottom:10,alignItems:"flex-start"}},
+            React.createElement("div",{style:{width:26,height:26,borderRadius:13,background:Y,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:11,fontWeight:700}},"✓"),
+            React.createElement("div",null,React.createElement("div",{style:{fontSize:13,fontWeight:500}},t),React.createElement("div",{style:{fontSize:12,color:"#888"}},d))
+          ))
+        )),
+        React.createElement("button",{style:{width:"100%",height:54,borderRadius:14,fontWeight:700,fontSize:17,background:Y,border:"none",marginBottom:16}},"Unlock full project — $21"),
+
+        // Save project section
+        saveState==="idle"&&React.createElement("div",{style:{background:"white",borderRadius:14,border:`1px solid ${BD}`,padding:16,marginBottom:8}},
+          React.createElement("div",{style:{fontSize:14,fontWeight:600,marginBottom:4}},"Want to save this project and come back to it?"),
+          React.createElement("div",{style:{fontSize:13,color:"#777",marginBottom:12,lineHeight:1.5}},"Store multiple projects, track your estimates and share with your builder — just add your name and email and we'll send you a sign-in link. No password needed."),
+          React.createElement("button",{onClick:()=>setSaveState("asking"),style:{width:"100%",height:44,borderRadius:10,fontWeight:600,fontSize:14,background:"#F7F7F7",border:`1px solid ${BD}`,color:TX}},"Save my project →")
+        ),
+
+        saveState==="asking"&&React.createElement("div",{style:{background:"white",borderRadius:14,border:`1.5px solid ${Y}`,padding:16,marginBottom:8}},
+          React.createElement("div",{style:{fontSize:14,fontWeight:600,marginBottom:12}},"Save your project"),
+          React.createElement("input",{value:saveName,onChange:e=>setSaveName(e.target.value),placeholder:"Your first name",
+            style:{width:"100%",height:46,border:`1px solid ${BD}`,borderRadius:10,padding:"0 12px",fontSize:15,marginBottom:8}}),
+          React.createElement("input",{type:"email",value:saveEmail,onChange:e=>setSaveEmail(e.target.value),placeholder:"Your email address",
+            style:{width:"100%",height:46,border:`1px solid ${BD}`,borderRadius:10,padding:"0 12px",fontSize:15,marginBottom:12}}),
+          React.createElement("button",{onClick:sendMagicLink,disabled:!saveEmail.trim()||!saveName.trim(),
+            style:{width:"100%",height:46,borderRadius:10,fontWeight:700,fontSize:15,background:Y,border:"none",opacity:(!saveEmail.trim()||!saveName.trim())?0.5:1}},
+            "Send me a sign-in link"),
+          React.createElement("div",{style:{fontSize:11,color:"#aaa",textAlign:"center",marginTop:8}},"We'll email you a link — click it and you're straight in. No password ever.")
+        ),
+
+        saveState==="sending"&&React.createElement("div",{style:{background:"white",borderRadius:14,border:`1px solid ${BD}`,padding:24,textAlign:"center",marginBottom:8}},
+          React.createElement("div",{style:{width:24,height:24,border:`3px solid ${BD}`,borderTopColor:Y,borderRadius:"50%",margin:"0 auto 12px"},className:"spin"}),
+          React.createElement("div",{style:{fontSize:14,color:"#666"}},"Sending your sign-in link...")
+        ),
+
+        saveState==="sent"&&React.createElement("div",{style:{background:"#F0FDF4",borderRadius:14,border:"1px solid #86EFAC",padding:16,textAlign:"center",marginBottom:8}},
+          React.createElement("div",{style:{fontSize:24,marginBottom:8}},"✓"),
+          React.createElement("div",{style:{fontSize:15,fontWeight:600,color:"#166534",marginBottom:4}},"Check your email"),
+          React.createElement("div",{style:{fontSize:13,color:"#4B7B58",lineHeight:1.5}},`We've sent a sign-in link to ${saveEmail}. Click it and your project will be waiting for you.`)
+        ),
+
+        React.createElement("button",{onClick:()=>setScreen(1),style:{background:"none",border:"none",fontSize:13,color:"#bbb",textDecoration:"underline",display:"block",margin:"8px auto 0"}},"Start a new project"),
+        React.createElement(BackBtn,null)
+      )
+    );
+}
+
+ReactDOM.render(React.createElement(App),document.getElementById("root"));
+</script>
+</body>
+</html>

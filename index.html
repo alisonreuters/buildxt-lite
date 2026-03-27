@@ -341,7 +341,7 @@ function App(){
         card(React.createElement("div",null,
           React.createElement("label",{style:{fontSize:13,fontWeight:500,display:"block",marginBottom:6}},"What's your postcode?"),
           React.createElement("input",{value:form.postcode,onChange:e=>upd("postcode",e.target.value.replace(/\D/g,"").slice(0,4)),
-            placeholder:"e.g. 2095",inputMode:"numeric",autoFocus:true,
+            placeholder:"Postcode",inputMode:"numeric",autoFocus:true,
             style:{width:"100%",height:52,border:`1.5px solid ${BD}`,borderRadius:12,padding:"0 16px",fontSize:18,fontWeight:600,textAlign:"center",letterSpacing:4,marginBottom:4}}),
           React.createElement("div",{style:{fontSize:12,color:"#888",textAlign:"center",lineHeight:1.5,marginTop:6}},
             "I use this to check wind region and terrain category for your area — it affects how your structure needs to be built."),
@@ -483,8 +483,8 @@ function App(){
               `${est.rules.nSteps} risers @ ${est.rules.riser}mm · 300mm going · max width ${Math.round(parseFloat(form.length)*1000)}mm`)
           )
         )),
-        React.createElement(PBtn,{label:"See my layout →",onClick:()=>go(3)}),
-        React.createElement(BackBtn,null)
+        screen===3&&React.createElement(PBtn,{label:"See my layout →",onClick:()=>go(3)}),
+        screen===3&&React.createElement(BackBtn,null)
       ),
 
       // ── SCREEN 4: Layout plan ───────────────────────────────────
@@ -599,13 +599,31 @@ function App(){
                   (form.placements||{})[k]?`Remove ${l}`:`+ ${l}`))
             )
           )
-        )),
-        React.createElement("div",{style:{background:"white",borderRadius:12,border:`1px solid ${BD}`,padding:12,marginBottom:12,fontSize:12,color:"#666",lineHeight:1.6,borderLeft:`3px solid ${Y}`}},
-          React.createElement("b",{style:{color:TX}},"Jeff's read: "),
-          `${form.deckLevel==="raised"?"Raised "+form.heightMm+"mm · "+est.rules.nSteps+" risers @ "+est.rules.riser+"mm":"Ground level"} · ${form.siteCondition==="flat"?"Flat site":"Site needs levelling"} · ${BOARDS[form.deckingType||"merbau"].label} ${BOARDS[form.deckingType||"merbau"].w}mm · ${form.stairType==="none"?"No stairs":"Stairs "+{"N":"north","S":"south","E":"east","W":"west"}[form.layoutStairs||"S"]}${form.balustradeType!=="none"?" · "+form.balustradeType+" balustrade":""}`
         ),
-        React.createElement(PBtn,{label:"See 3D set out →",onClick:()=>go(4)}),
-        React.createElement(BackBtn,null)
+        screen===4&&React.createElement("div",{style:{background:"white",borderRadius:12,border:`1px solid ${BD}`,padding:12,marginBottom:12,fontSize:12,color:"#666",lineHeight:1.6,borderLeft:`3px solid ${Y}`}},
+          React.createElement("b",{style:{color:TX}},"Jeff's read: "),
+          (()=>{
+            const hmm=Number(form.heightMm)||0;
+            const raised=form.deckLevel==="raised";
+            const parts=[];
+            parts.push(raised?"Raised "+form.heightMm+"mm · "+est.rules.nSteps+" risers @ "+est.rules.riser+"mm":"Ground level");
+            parts.push(form.siteCondition==="flat"?"Flat site":"Site needs levelling");
+            parts.push(BOARDS[form.deckingType||"merbau"].label+" "+BOARDS[form.deckingType||"merbau"].w+"mm");
+            if(form.stairType!=="none"){
+              parts.push("Stairs facing "+({"N":"north","S":"south","E":"east","W":"west"}[form.layoutStairs||"S"]));
+            } else if(hmm>=270){
+              parts.push("Stairs by owner");
+            }
+            if(form.balustradeType!=="none"){
+              parts.push(form.balustradeType+" balustrade");
+            } else if(hmm>=730){
+              parts.push("Balustrade by owner");
+            }
+            return parts.join(" · ");
+          })()
+        ),
+        screen===4&&React.createElement(PBtn,{label:"See 3D set out →",onClick:()=>go(4)}),
+        screen===4&&React.createElement(BackBtn,null)
       ),
 
       // ── SCREEN 5: 3D Set out ────────────────────────────────────
@@ -712,7 +730,8 @@ function App(){
         React.createElement("button",{onClick:()=>setScreen(1),style:{background:"none",border:"none",fontSize:13,color:"#bbb",textDecoration:"underline",display:"block",margin:"8px auto 0"}},"Start a new project"),
         React.createElement(BackBtn,null)
       )
-    );
+    )
+  );
 }
 
 ReactDOM.render(React.createElement(App),document.getElementById("root"));

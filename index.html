@@ -277,8 +277,8 @@ function App(){
 
   const validate=(s)=>{
     const e={};
-    if(s===1&&!/^\d{4}$/.test(form.postcode||""))e.postcode="Please enter a valid 4-digit postcode.";
-    if(s===3&&!form.siteCondition)e.siteCondition="Please select site condition.";
+    if(s===1&&!/^\d{4}$/.test(form.postcode||""))e.postcode="Just need a valid 4-digit postcode to continue.";
+    if(s===3&&!form.siteCondition)e.siteCondition="Just let me know if the site is flat or needs some work first.";
     setErrors(e);return Object.keys(e).length===0;
   };
   const go=(s)=>{if(!validate(s))return;setScreen(x=>x+1);};
@@ -340,8 +340,8 @@ function App(){
         ),
         card(React.createElement("div",null,
           React.createElement("label",{style:{fontSize:13,fontWeight:500,display:"block",marginBottom:6}},"What's your postcode?"),
-          React.createElement("input",{value:form.postcode,onChange:e=>upd("postcode",e.target.value.replace(/\D/g,"").slice(0,4)),
-            placeholder:"Postcode",inputMode:"numeric",autoFocus:true,
+          React.createElement("input",{value:form.postcode,onChange:e=>{upd("postcode",e.target.value.replace(/\D/g,"").slice(0,4));setErrors(er=>({...er,postcode:undefined}));},
+            placeholder:"",inputMode:"numeric",autoFocus:true,
             style:{width:"100%",height:52,border:`1.5px solid ${BD}`,borderRadius:12,padding:"0 16px",fontSize:18,fontWeight:600,textAlign:"center",letterSpacing:4,marginBottom:4}}),
           React.createElement("div",{style:{fontSize:12,color:"#888",textAlign:"center",lineHeight:1.5,marginTop:6}},
             "I use this to check wind region and terrain category for your area — it affects how your structure needs to be built."),
@@ -390,7 +390,7 @@ function App(){
           React.createElement("div",{style:{fontSize:13,fontWeight:600,marginBottom:8,color:"#555"}},"Site conditions"),
           React.createElement("div",{style:{display:"flex",gap:8,marginBottom:10}},
             [["flat","Flat","No excavation needed"],["work","Needs work","Some levelling required"]].map(([v,l,s])=>
-              React.createElement("button",{key:v,style:{flex:1,padding:"12px 8px",borderRadius:12,border:form.siteCondition===v?`2px solid ${Y}`:`1px solid #ccc`,background:form.siteCondition===v?"#FFF9E6":"white",textAlign:"left"},onClick:()=>upd("siteCondition",v)},
+              React.createElement("button",{key:v,style:{flex:1,padding:"12px 8px",borderRadius:12,border:form.siteCondition===v?`2px solid ${Y}`:`1px solid #ccc`,background:form.siteCondition===v?"#FFF9E6":"white",textAlign:"left"},onClick:()=>{upd("siteCondition",v);setErrors(e=>({...e,siteCondition:undefined}));} },
                 React.createElement("div",{style:{fontSize:14,fontWeight:600}},l),
                 React.createElement("div",{style:{fontSize:11,color:"#888",marginTop:2}},s))
             )
@@ -490,116 +490,102 @@ function App(){
       // ── SCREEN 4: Layout plan ───────────────────────────────────
       screen===4&&React.createElement("div",{className:"fade"},
         jeff(`Your ${form.length}m × ${form.width}m ${form.projectType}`,"Adjust the layout — board direction, stairs and features."),
-        card(React.createElement("div",null,
-          React.createElement("div",{style:{position:"relative",marginBottom:10}},React.createElement("svg",{width:"100%",viewBox:(()=>{
-              const L=parseFloat(form.length)||5,D=parseFloat(form.width)||4;
-              const ratio=L/D;
-              // Keep deck proportional — max 280px wide, scale height accordingly
-              const deckW=Math.min(280,Math.max(140,280));
-              const deckH=Math.min(200,Math.max(80,Math.round(deckW/ratio)));
-              const vw=deckW+60,vh=deckH+60;
-              return `0 0 ${vw} ${vh}`;
-            })(),style:{display:"block",background:"#FAFAFA",borderRadius:8}},
-            ...(()=>{
-              const L=parseFloat(form.length)||5,D=parseFloat(form.width)||4;
-              const ratio=L/D;
-              const deckW=Math.min(280,Math.max(140,280));
-              const deckH=Math.min(200,Math.max(80,Math.round(deckW/ratio)));
-              const vw=deckW+60,vh=deckH+60;
-              const ox=30,oy=30;
-              const bw=BOARDS[form.deckingType||"merbau"].w;
-              const scX=deckW/L,scY=deckH/D;
-              const centresPx=(bw+6)/1000*(form.layoutBoard==="EW"?scY:scX);
-              const lines=[
-                React.createElement("rect",{key:"bg",x:ox,y:oy,width:deckW,height:deckH,fill:"#F5EFD8",stroke:"#111",strokeWidth:2}),
-                React.createElement("defs",null,React.createElement("clipPath",{id:"dc"},React.createElement("rect",{x:ox,y:oy,width:deckW,height:deckH}))),
-              ];
-              if(form.layoutBoard==="EW"){for(let y=oy+centresPx;y<oy+deckH;y+=centresPx)lines.push(React.createElement("line",{key:y,x1:ox,y1:y,x2:ox+deckW,y2:y,stroke:"#C8BC9A",strokeWidth:Math.max(1.5,centresPx*0.55),clipPath:"url(#dc)"}));}
-              else{for(let x=ox+centresPx;x<ox+deckW;x+=centresPx)lines.push(React.createElement("line",{key:x,x1:x,y1:oy,x2:x,y2:oy+deckH,stroke:"#C8BC9A",strokeWidth:Math.max(1.5,centresPx*0.55),clipPath:"url(#dc)"}));}
-              lines.push(React.createElement("rect",{key:"border",x:ox,y:oy,width:deckW,height:deckH,fill:"none",stroke:"#111",strokeWidth:2}));
-              // Compass labels
-              lines.push(React.createElement("text",{key:"N",x:ox+deckW/2,y:oy-8,textAnchor:"middle",fontSize:10,fill:"#bbb"},"N"));
-              lines.push(React.createElement("text",{key:"S",x:ox+deckW/2,y:oy+deckH+16,textAnchor:"middle",fontSize:10,fill:"#bbb"},"S"));
-              lines.push(React.createElement("text",{key:"W",x:ox-10,y:oy+deckH/2+4,textAnchor:"middle",fontSize:10,fill:"#bbb"},"W"));
-              lines.push(React.createElement("text",{key:"E",x:ox+deckW+10,y:oy+deckH/2+4,textAnchor:"middle",fontSize:10,fill:"#bbb"},"E"));
-              // Dimension labels
-              lines.push(React.createElement("text",{key:"dimL",x:ox+deckW/2,y:oy+deckH+28,textAnchor:"middle",fontSize:9,fill:"#888"},`${form.length}m`));
-              lines.push(React.createElement("text",{key:"dimD",x:ox+deckW+24,y:oy+deckH/2+4,textAnchor:"middle",fontSize:9,fill:"#888",transform:`rotate(-90,${ox+deckW+24},${oy+deckH/2})`},`${form.width}m`));
+        card((()=>{
+          const L=parseFloat(form.length)||5;
+          const D=parseFloat(form.width)||4;
+          const board=BOARDS[form.deckingType||"merbau"];
+          // Scale deck to fit in a fixed 300×220 canvas proportionally
+          const maxW=260,maxH=180;
+          const scaleToFit=Math.min(maxW/L,maxH/D);
+          const dW=Math.round(L*scaleToFit);
+          const dH=Math.round(D*scaleToFit);
+          const ox=Math.round((300-dW)/2);
+          const oy=Math.round((220-dH)/2);
+          // Board lines
+          const centresMm=board.w+board.gap;
+          const isEW=form.layoutBoard==="EW";
+          const centresPx=centresMm/1000*(isEW?scaleToFit:scaleToFit);
+          const boardLines=[];
+          if(isEW){
+            for(let y=oy+centresPx;y<oy+dH;y+=centresPx)
+              boardLines.push(React.createElement("line",{key:y,x1:ox,y1:y,x2:ox+dW,y2:y,stroke:"#C8BC9A",strokeWidth:Math.max(1.5,centresPx*0.55),clipPath:"url(#dc4)"}));
+          } else {
+            for(let x=ox+centresPx;x<ox+dW;x+=centresPx)
+              boardLines.push(React.createElement("line",{key:x,x1:x,y1:oy,x2:x,y2:oy+dH,stroke:"#C8BC9A",strokeWidth:Math.max(1.5,centresPx*0.55),clipPath:"url(#dc4)"}));
+          }
+          // Stairs
+          let stairEl=null;
+          if(form.stairType!=="none"){
+            const sp=form.layoutStairs||"S";
+            const isNS=sp==="S"||sp==="N";
+            const maxStairMm=isNS?L*1000:D*1000;
+            const actualWmm=form.layoutStairsFull?maxStairMm:Math.min(Number(form.stairWidthMm)||1200,maxStairMm);
+            const stWpx=Math.round(actualWmm/1000*scaleToFit);
+            const stH=16;
+            const positions={
+              S:[ox+(dW-stWpx)/2, oy+dH, stWpx, stH],
+              N:[ox+(dW-stWpx)/2, oy-stH, stWpx, stH],
+              E:[ox+dW, oy+(dH-stWpx)/2, stH, stWpx],
+              W:[ox-stH, oy+(dH-stWpx)/2, stH, stWpx],
+            };
+            const[rx,ry,rw,rh]=positions[sp]||positions.S;
+            stairEl=React.createElement("g",null,
+              React.createElement("rect",{x:Math.round(rx),y:Math.round(ry),width:Math.round(rw),height:Math.round(rh),fill:Y,stroke:"#111",strokeWidth:1.5,rx:2}),
+              (sp==="S"||sp==="N")&&React.createElement("text",{x:Math.round(rx+rw/2),y:Math.round(ry+(sp==="S"?11:-4)),textAnchor:"middle",fontSize:8,fill:"#555"},"stairs")
+            );
+          }
+          // Feature zones
+          const bbqEl=(form.placements||{}).bbq?React.createElement("g",null,
+            React.createElement("rect",{x:ox+dW-Math.min(56,dW*0.25)-4,y:oy+4,width:Math.min(56,dW*0.25),height:Math.min(36,dH*0.3),rx:3,fill:"#FFF0C0",stroke:"#E0A800",strokeWidth:1.5}),
+            React.createElement("text",{x:ox+dW-Math.min(56,dW*0.25)/2-4,y:oy+Math.min(36,dH*0.3)/2+8,textAnchor:"middle",fontSize:9,fill:"#7A5800",fontWeight:"bold"},"BBQ")
+          ):null;
+          const alfEl=(form.placements||{}).alfresco?React.createElement("g",null,
+            React.createElement("rect",{x:ox+4,y:oy+4,width:Math.min(80,dW*0.4),height:Math.min(36,dH*0.3),rx:3,fill:"#E0F4FF",stroke:"#4AABDE",strokeWidth:1.5}),
+            React.createElement("text",{x:ox+4+Math.min(80,dW*0.4)/2,y:oy+Math.min(36,dH*0.3)/2+8,textAnchor:"middle",fontSize:9,fill:"#1A5F7A",fontWeight:"bold"},"Alfresco")
+          ):null;
 
-              // Stairs
-              if(form.stairType!=="none"){
-                const sp=form.layoutStairs||"S";
-                const isNS=sp==="S"||sp==="N";
-                const actualWmm=form.layoutStairsFull?(isNS?L*1000:D*1000):Math.min(Number(form.stairWidthMm)||1200,isNS?L*1000:D*1000);
-                const stWpx=isNS?Math.min(actualWmm/1000*scX,deckW-4):Math.min(actualWmm/1000*scY,deckH-4);
-                const stH=16;
-                const sxC=ox+(deckW-stWpx)/2, syC=oy+(deckH-stWpx)/2;
-                const coords={S:[sxC,oy+deckH,stWpx,stH],N:[sxC,oy-stH,stWpx,stH],E:[ox+deckW,syC,stH,stWpx],W:[ox-stH,syC,stH,stWpx]};
-                const[rx,ry,rw,rh]=coords[sp]||coords.S;
-                lines.push(React.createElement("rect",{key:"stair",x:rx,y:ry,width:rw,height:rh,fill:Y,stroke:"#111",strokeWidth:1.5,rx:2}));
-                if(isNS)lines.push(React.createElement("text",{key:"stairLabel",x:rx+rw/2,y:ry+11,textAnchor:"middle",fontSize:8,fill:"#555"},"stairs"));
-              }
-
-              // BBQ / Alfresco
-              if((form.placements||{}).bbq){
-                const bw2=Math.min(54,deckW*0.25),bh2=Math.min(38,deckH*0.3);
-                lines.push(React.createElement("rect",{key:"bbq",x:ox+deckW-bw2-4,y:oy+4,width:bw2,height:bh2,rx:4,fill:"#FFF0C0",stroke:"#E0A800",strokeWidth:1.5}));
-                lines.push(React.createElement("text",{key:"bbqL",x:ox+deckW-bw2/2-4,y:oy+bh2/2+8,textAnchor:"middle",fontSize:9,fill:"#7A5800",fontWeight:"bold"},"BBQ"));
-              }
-              if((form.placements||{}).alfresco){
-                const aw=Math.min(80,deckW*0.35),ah=Math.min(38,deckH*0.3);
-                lines.push(React.createElement("rect",{key:"alf",x:ox+4,y:oy+4,width:aw,height:ah,rx:4,fill:"#E0F4FF",stroke:"#4AABDE",strokeWidth:1.5}));
-                lines.push(React.createElement("text",{key:"alfL",x:ox+aw/2+4,y:oy+ah/2+8,textAnchor:"middle",fontSize:9,fill:"#1A5F7A",fontWeight:"bold"},"Alfresco"));
-              }
-              return lines;
-            })()
-          )),
-            form.stairType!=="none"&&(()=>{
-              const L=parseFloat(form.length)||5;
-              const D=parseFloat(form.width)||4;
-              const sp=form.layoutStairs||"S";
-              const isNS=sp==="S"||sp==="N";
-              // Actual stair width capped at deck dimension — matches estimate engine
-              const actualWmm=form.layoutStairsFull
-                ?(isNS?L*1000:D*1000)
-                :Math.min(Number(form.stairWidthMm)||1200, isNS?L*1000:D*1000);
-              // Scale to SVG proportionally: 220px=L, 160px=D
-              const stWpx=isNS
-                ?Math.min(actualWmm/1000*(220/L),218)
-                :Math.min(actualWmm/1000*(160/D),158);
-              const sx=40+(220-stWpx)/2;
-              const sy=30+(160-stWpx)/2;
-              const positions={
-                S:[sx,190,stWpx,18],
-                N:[sx,12,stWpx,18],
-                E:[260,sy,18,stWpx],
-                W:[22,sy,18,stWpx]
-              };
-              const[rx,ry,rw,rh]=positions[sp]||positions.S;
-              return React.createElement("g",null,
-                React.createElement("rect",{x:rx,y:ry,width:rw,height:rh,fill:Y,stroke:"#111",strokeWidth:1.5,rx:2}),
-                isNS&&React.createElement("text",{x:rx+rw/2,y:ry+11,textAnchor:"middle",fontSize:8,fill:"#555"},"stairs")
-              );
-            })(),
-            (form.placements||{}).bbq&&React.createElement("g",null,React.createElement("rect",{x:198,y:36,width:54,height:38,rx:4,fill:"#FFF0C0",stroke:"#E0A800",strokeWidth:1.5}),React.createElement("text",{x:225,y:59,textAnchor:"middle",fontSize:9,fill:"#7A5800",fontWeight:"bold"},"BBQ")),
-            (form.placements||{}).alfresco&&React.createElement("g",null,React.createElement("rect",{x:44,y:36,width:80,height:38,rx:4,fill:"#E0F4FF",stroke:"#4AABDE",strokeWidth:1.5}),React.createElement("text",{x:84,y:59,textAnchor:"middle",fontSize:9,fill:"#1A5F7A",fontWeight:"bold"},"Alfresco"))
-          ),
-          React.createElement("div",{style:{fontSize:12,color:"#888",textAlign:"center",marginBottom:12}},`${BOARDS[form.deckingType||"merbau"].w}mm ${BOARDS[form.deckingType||"merbau"].label} boards · ${est.area.toFixed(1)}m²`),
-          React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}},
-            React.createElement("button",{style:{border:`1px solid ${BD}`,borderRadius:10,padding:"10px",background:"white",fontSize:12,textAlign:"left"},onClick:()=>upd("layoutBoard",form.layoutBoard==="EW"?"NS":"EW")},
-              React.createElement("div",{style:{fontSize:10,color:"#aaa",marginBottom:2}},"Board direction"),form.layoutBoard==="EW"?"← E–W →":"↑ N–S ↓"),
-            React.createElement("button",{style:{border:`1px solid ${BD}`,borderRadius:10,padding:"10px",background:"white",fontSize:12,textAlign:"left"},onClick:()=>{const o=["N","E","S","W"];upd("layoutStairs",o[(o.indexOf(form.layoutStairs||"S")+1)%4]);}},
-              React.createElement("div",{style:{fontSize:10,color:"#aaa",marginBottom:2}},"Stairs face"),{"N":"North","S":"South","E":"East","W":"West"}[form.layoutStairs||"S"]+" side"),
-            React.createElement("button",{style:{border:`1px solid ${BD}`,borderRadius:10,padding:"10px",background:form.layoutStairsFull?"#FFF9E6":"white",fontSize:12,textAlign:"left"},onClick:()=>upd("layoutStairsFull",!form.layoutStairsFull)},
-              React.createElement("div",{style:{fontSize:10,color:"#aaa",marginBottom:2}},"Stair width"),form.layoutStairsFull?"Full side":"Custom"),
-            React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:5}},
-              [["bbq","BBQ zone","#FFF0C0","#E0A800"],["alfresco","Alfresco","#E0F4FF","#4AABDE"]].map(([k,l,bg,br])=>
-                React.createElement("button",{key:k,style:{border:`1px solid ${(form.placements||{})[k]?br:BD}`,borderRadius:8,padding:"7px 8px",background:(form.placements||{})[k]?bg:"white",fontSize:11,textAlign:"left",fontWeight:(form.placements||{})[k]?700:400},
-                  onClick:()=>{const cur=(form.placements||{})[k];upd("placements",{...(form.placements||{}),[k]:cur?null:{x:0,y:0}});}},
-                  (form.placements||{})[k]?`Remove ${l}`:`+ ${l}`))
+          return React.createElement("div",null,
+            React.createElement("svg",{width:"100%",viewBox:"0 0 300 220",style:{display:"block",background:"#FAFAFA",borderRadius:8,marginBottom:10}},
+              React.createElement("defs",null,React.createElement("clipPath",{id:"dc4"},React.createElement("rect",{x:ox,y:oy,width:dW,height:dH}))),
+              React.createElement("rect",{x:ox,y:oy,width:dW,height:dH,fill:"#F5EFD8",stroke:"#111",strokeWidth:2}),
+              ...boardLines,
+              React.createElement("rect",{x:ox,y:oy,width:dW,height:dH,fill:"none",stroke:"#111",strokeWidth:2}),
+              React.createElement("text",{x:ox+dW/2,y:oy-6,textAnchor:"middle",fontSize:9,fill:"#bbb"},"N"),
+              React.createElement("text",{x:ox+dW/2,y:oy+dH+14,textAnchor:"middle",fontSize:9,fill:"#bbb"},"S"),
+              React.createElement("text",{x:ox-8,y:oy+dH/2+4,textAnchor:"middle",fontSize:9,fill:"#bbb"},"W"),
+              React.createElement("text",{x:ox+dW+8,y:oy+dH/2+4,textAnchor:"middle",fontSize:9,fill:"#bbb"},"E"),
+              React.createElement("text",{x:ox+dW/2,y:oy+dH+26,textAnchor:"middle",fontSize:9,fill:"#888"},`${form.length}m`),
+              React.createElement("text",{x:ox+dW+20,y:oy+dH/2+4,textAnchor:"middle",fontSize:9,fill:"#888",transform:`rotate(-90,${ox+dW+20},${oy+dH/2})`},`${form.width}m`),
+              stairEl,
+              bbqEl,
+              alfEl
+            ),
+            React.createElement("div",{style:{fontSize:12,color:"#888",textAlign:"center",marginBottom:12}},
+              `${board.w}mm ${board.label} · ${form.length}m × ${form.width}m = ${est.area.toFixed(1)}m²`),
+            React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}},
+              React.createElement("button",{style:{border:`1px solid ${BD}`,borderRadius:10,padding:"10px",background:"white",fontSize:12,textAlign:"left"},
+                onClick:()=>upd("layoutBoard",form.layoutBoard==="EW"?"NS":"EW")},
+                React.createElement("div",{style:{fontSize:10,color:"#aaa",marginBottom:2}},"Board direction"),
+                form.layoutBoard==="EW"?"← E–W →":"↑ N–S ↓"),
+              React.createElement("button",{style:{border:`1px solid ${BD}`,borderRadius:10,padding:"10px",background:"white",fontSize:12,textAlign:"left"},
+                onClick:()=>{const o=["N","E","S","W"];upd("layoutStairs",o[(o.indexOf(form.layoutStairs||"S")+1)%4]);}},
+                React.createElement("div",{style:{fontSize:10,color:"#aaa",marginBottom:2}},"Stairs face"),
+                {"N":"North","S":"South","E":"East","W":"West"}[form.layoutStairs||"S"]+" side"),
+              React.createElement("button",{style:{border:`1px solid ${BD}`,borderRadius:10,padding:"10px",background:form.layoutStairsFull?"#FFF9E6":"white",fontSize:12,textAlign:"left"},
+                onClick:()=>upd("layoutStairsFull",!form.layoutStairsFull)},
+                React.createElement("div",{style:{fontSize:10,color:"#aaa",marginBottom:2}},"Stair width"),
+                form.layoutStairsFull?"Full side":"Custom"),
+              React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:5}},
+                [["bbq","BBQ zone","#FFF0C0","#E0A800"],["alfresco","Alfresco","#E0F4FF","#4AABDE"]].map(([k,l,bg,br])=>
+                  React.createElement("button",{key:k,
+                    style:{border:`1px solid ${(form.placements||{})[k]?br:BD}`,borderRadius:8,padding:"7px 8px",
+                      background:(form.placements||{})[k]?bg:"white",fontSize:11,textAlign:"left",fontWeight:(form.placements||{})[k]?700:400},
+                    onClick:()=>{const cur=(form.placements||{})[k];upd("placements",{...(form.placements||{}),[k]:cur?null:{x:0,y:0}});}},
+                    (form.placements||{})[k]?`Remove ${l}`:`+ ${l}`))
+              )
             )
-          )
-        ),
+          );
+        })()),
         screen===4&&React.createElement("div",{style:{background:"white",borderRadius:12,border:`1px solid ${BD}`,padding:12,marginBottom:12,fontSize:12,color:"#666",lineHeight:1.6,borderLeft:`3px solid ${Y}`}},
           React.createElement("b",{style:{color:TX}},"Jeff's read: "),
           (()=>{
@@ -610,7 +596,7 @@ function App(){
             parts.push(form.siteCondition==="flat"?"Flat site":"Site needs levelling");
             parts.push(BOARDS[form.deckingType||"merbau"].label+" "+BOARDS[form.deckingType||"merbau"].w+"mm");
             if(form.stairType!=="none"){
-              parts.push("Stairs facing "+({"N":"north","S":"south","E":"east","W":"west"}[form.layoutStairs||"S"]));
+              parts.push("Stairs facing "+{"N":"north","S":"south","E":"east","W":"west"}[form.layoutStairs||"S"]);
             } else if(hmm>=270){
               parts.push("Stairs by owner");
             }

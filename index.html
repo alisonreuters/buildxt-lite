@@ -80,16 +80,59 @@ const P={
   sundries_base:95,sundries_m2:2.5,
 };
 
-function structRules(L,D,hmm,hasBal){
-  const high=hmm>1800,maxSpX=high?1.5:1.8;
-  const nPX=Math.ceil(L/maxSpX)+1,nPY=Math.ceil(D/1.2)+1;
-  const pXs=Array.from({length:nPX},(_,i)=>i*(L/Math.max(1,nPX-1)));
-  const pYs=Array.from({length:nPY},(_,j)=>j*(D/Math.max(1,nPY-1)));
+function structRules(L,D,hmm,hasBal,boardDir){
+  const high=hmm>1800;
+  const maxPostSpacing=high?1.5:1.8; // max post spacing along bearer
+  const maxBearerSpan=1.2;           // max bearer spacing (joist span)
+
+  // Board direction determines bearer/joist orientation:
+  // E-W boards → joists run N-S → bearers run E-W → posts along E-W at maxPostSpacing
+  // N-S boards → joists run E-W → bearers run N-S → posts along N-S at maxPostSpacing
+  const isEW=(boardDir||"EW")==="EW";
+
+  // Bearer rows: perpendicular to bearers, spaced at maxBearerSpan
+  // Post rows along bearer: spaced at maxPostSpacing
+  const nBearerRows= isEW ? Math.ceil(D/maxBearerSpan)+1 : Math.ceil(L/maxBearerSpan)+1;
+  const nPostsPerBearer= isEW ? Math.ceil(L/maxPostSpacing)+1 : Math.ceil(D/maxPostSpacing)+1;
+
+  // Bearer positions (across deck, perpendicular to board direction)
+  const bearerPositions=Array.from({length:nBearerRows},(_,i)=>
+    isEW ? i*(D/Math.max(1,nBearerRows-1)) : i*(L/Math.max(1,nBearerRows-1))
+  );
+  // Post positions along each bearer
+  const postPositions=Array.from({length:nPostsPerBearer},(_,i)=>
+    isEW ? i*(L/Math.max(1,nPostsPerBearer-1)) : i*(D/Math.max(1,nPostsPerBearer-1))
+  );
+
+  const nFootings=nBearerRows*nPostsPerBearer;
+
+  // Bearer lengths: perimeter bearers + internal bearers
+  // Perimeter = 4 sides. Internal = (nBearerRows-2) rows
+  const bearerRunLength=isEW?L:D;
+  const perimBearerLm=bearerRunLength*4; // 4 perimeter sides (approx — 2 long + 2 short)
+  const internalBearerLm=bearerRunLength*Math.max(0,nBearerRows-2);
+  // Double perimeter bearers if balustrade, single internal
+  const totalBearerLm=Math.ceil((hasBal?perimBearerLm*2:perimBearerLm)+internalBearerLm);
+
+  // Joist length and count
+  const joistSpan=isEW?D:L;       // joists span perpendicular to boards
+  const joistRun=isEW?L:D;        // joists spaced along board direction
+  const nJoists=Math.ceil(joistRun/0.45)+1;
+  const joistLmTotal=Math.ceil(nJoists*joistSpan);
+
   const nSteps=hmm>0?Math.ceil(hmm/180):0;
   const riser=nSteps>0?Math.round(hmm/nSteps):160;
-  return{pXs,pYs,joistLm:P[high?"joist140_lm":"joist90_lm"],
-    joistLabel:high?"140×45":"90×45",dblBearer:hasBal,high,maxSpX,
-    nFootings:nPX*nPY,nSteps,riser};
+
+  return{
+    nBearerRows,nPostsPerBearer,bearerPositions,postPositions,
+    joistLm:P[high?"joist140_lm":"joist90_lm"],
+    joistLabel:high?"140×45":"90×45",
+    joistLmTotal,totalBearerLm,
+    bearerRunLength,isEW,
+    dblBearer:hasBal,high,maxPostSpacing,
+    nFootings,nSteps,riser,
+    bearerDesc:hasBal?"2/140×45 H4 perimeter (balustrade) + 140×45 internal":"140×45 H4 MGP10"
+  };
 }
 
 function calcEstimate(f){
@@ -97,40 +140,58 @@ function calcEstimate(f){
   const raised=f.deckLevel==="raised",hmm=Number(f.heightMm)||300;
   const bk=f.deckingType||"merbau",board=BOARDS[bk];
   const hasBal=f.balustradeType&&f.balustradeType!=="none";
-  const rules=structRules(L,D,hmm,hasBal);
-  const {pXs,pYs,joistLm,dblBearer,nFootings}=rules;
+  const boardDir=f.layoutBoard||"EW";
+  const rules=structRules(L,D,hmm,hasBal,boardDir);
+  const {nFootings,joistLm,joistLmTotal,totalBearerLm,isEW,dblBearer,nPostsPerBearer,nBearerRows}=rules;
+
   const boardCentres=(board.w+board.gap)/1000;
   const deckingLm=Math.ceil(area/boardCentres*1.10);
-  const bearerLm=Math.ceil(pYs.length*L);
+
   const perimLm=(L+D)*2;
-  const joistLmTotal=Math.ceil((Math.ceil(L/0.45)+1)*D);
-  const blockingLm=Math.ceil(Math.floor(D/1.2)*(Math.ceil(L/0.45)+1)*0.09);
-  const nPosts=pXs.length*pYs.length;
+  // Blocking: rows perpendicular to joists at 1200mm
+  const joistSpan=isEW?D:L;
+  const joistRun=isEW?L:D;
+  const nJoists=Math.ceil(joistRun/0.45)+1;
+  const blockingRows=Math.floor(joistSpan/1.2);
+  const blockingLm=Math.ceil(blockingRows*nJoists*0.09);
+
+  const nPosts=nFootings;
   const postHm=raised?(hmm/1000)+0.3:0.3;
-  const totalBolts=nPosts*2+Math.ceil(L/0.45)*2;
+  const totalBolts=nPosts*2+nJoists*2;
+
   const fixing=FIXINGS[board.type];
   const fixingQty=Math.ceil(deckingLm*fixing.qtyPerLm);
   const oilCans=board.type!=="composite"?Math.ceil(area/12):0;
+
   const stairW=Math.min(Number(f.stairWidthMm)||1200,L*1000);
   const stairCost=f.stairType==="none"?0:P.stairs_base+Math.max(0,(stairW-1200)/100)*P.stairs_per100mm;
   const balPerim=hasBal?Math.ceil(perimLm*0.6):0;
+
+  // Bearer line items — split perimeter (double if balustrade) and internal
+  const bearerRunLen=isEW?L:D;
+  const perimBearerLm=Math.ceil(bearerRunLen*4);
+  const internalBearerLm=Math.ceil(bearerRunLen*Math.max(0,nBearerRows-2));
+
   const items=[
-    {cat:"Footings",label:"Concrete footing bags 20kg",qty:nFootings*3,unit:"EA",rate:P.concrete,note:`${nFootings} footings`},
-    {cat:"Footings",label:"Uni-Pier adjustable supports",qty:nPosts,unit:"EA",rate:P.unipier},
-    raised?{cat:"Footings",label:`Timber posts 90×90 H4 (${postHm.toFixed(1)}m)`,qty:Math.ceil(nPosts*postHm),unit:"LM",rate:P.post90_lm}:null,
-    {cat:"Structure",label:dblBearer?"Bearers 2/140×45 H4 (dbl — balustrade)":"Bearers 140×45 H4 MGP10",qty:bearerLm,unit:"LM",rate:dblBearer?P.bearer_dbl_lm:P.bearer140_lm},
-    {cat:"Structure",label:`Joists ${rules.joistLabel} H3`,qty:joistLmTotal,unit:"LM",rate:joistLm,note:rules.high?"Upgraded >1800mm":""},
-    {cat:"Structure",label:"Joist blocking 90×45",qty:blockingLm,unit:"LM",rate:P.blocking_lm},
-    {cat:"Fixings",label:"Bolts M12×120 HDG",qty:totalBolts,unit:"EA",rate:P.bolt_m12},
+    {cat:"Footings",label:"Concrete footing bags 20kg",qty:nFootings*3,unit:"EA",rate:P.concrete,note:`${nFootings} footings · ${nBearerRows} rows × ${nPostsPerBearer} posts`},
+    {cat:"Footings",label:"Uni-Pier adjustable post supports",qty:nPosts,unit:"EA",rate:P.unipier},
+    raised?{cat:"Footings",label:`Timber posts 90×90 H4 (${postHm.toFixed(1)}m ea)`,qty:Math.ceil(nPosts*postHm),unit:"LM",rate:P.post90_lm}:null,
+    hasBal?{cat:"Structure",label:"Perimeter bearers 2/140×45 H4 (dbl — balustrade load)",qty:perimBearerLm,unit:"LM",rate:P.bearer_dbl_lm}:
+           {cat:"Structure",label:"Bearers 140×45 H4 MGP10",qty:perimBearerLm+internalBearerLm,unit:"LM",rate:P.bearer140_lm},
+    hasBal&&internalBearerLm>0?{cat:"Structure",label:"Internal bearers 140×45 H4 MGP10",qty:internalBearerLm,unit:"LM",rate:P.bearer140_lm,note:"Single — internal rows"}:null,
+    {cat:"Structure",label:`Joists ${rules.joistLabel} H3 @ 450mm ctrs`,qty:joistLmTotal,unit:"LM",rate:joistLm,note:rules.high?"Upgraded >1800mm":`${nJoists} joists × ${joistSpan.toFixed(1)}m`},
+    {cat:"Structure",label:"Joist blocking 90×45 @ 1200mm",qty:blockingLm,unit:"LM",rate:P.blocking_lm},
+    {cat:"Fixings",label:"Structural bolts M12×120 HDG",qty:totalBolts,unit:"EA",rate:P.bolt_m12},
     {cat:"Fixings",label:"Nuts M12 HDG",qty:totalBolts,unit:"EA",rate:P.nut_m12},
-    {cat:"Fixings",label:"Washers M12 galv",qty:totalBolts*2,unit:"EA",rate:P.washer_m12},
-    {cat:"Decking",label:`${board.label} ${board.w}×19 decking`,qty:deckingLm,unit:"LM",rate:board.price,note:`${area.toFixed(1)}m²`},
+    {cat:"Fixings",label:"Washers M12 galv sq",qty:totalBolts*2,unit:"EA",rate:P.washer_m12},
+    {cat:"Decking",label:`${board.label} ${board.w}×19 decking`,qty:deckingLm,unit:"LM",rate:board.price,note:`${area.toFixed(1)}m² · ${(1/boardCentres).toFixed(1)} boards/m`},
     {cat:"Decking",label:fixing.label,qty:fixingQty,unit:fixing.unit,rate:fixing.rate},
     oilCans>0?{cat:"Decking",label:"Decking oil 4L",qty:oilCans,unit:"EA",rate:P.deck_oil}:null,
-    f.stairType!=="none"?{cat:"Features",label:`Stairs (${stairW}mm · ${rules.nSteps} risers @ ${rules.riser}mm)`,qty:1,unit:"ITEM",rate:stairCost}:null,
-    balPerim>0?{cat:"Features",label:"Balustrade allowance",qty:balPerim,unit:"LM",rate:P.balustrade_lm}:null,
+    f.stairType!=="none"?{cat:"Features",label:`Stairs — ${stairW}mm wide · ${rules.nSteps} risers @ ${rules.riser}mm`,qty:1,unit:"ITEM",rate:stairCost}:null,
+    balPerim>0?{cat:"Features",label:"Balustrade allowance",qty:balPerim,unit:"LM",rate:P.balustrade_lm,note:"~60% perimeter"}:null,
     {cat:"Sundries",label:"Sundries & consumables",qty:1,unit:"ITEM",rate:P.sundries_base+area*P.sundries_m2},
   ].filter(Boolean);
+
   items.push({cat:"Labour",label:"Labour allowance",qty:Math.ceil(area),unit:"m²",rate:raised?72:55,note:"Indicative"});
   const total=items.reduce((s,i)=>s+(i.qty||0)*(i.rate||0),0);
   return{items,total,area,cats:[...new Set(items.map(i=>i.cat))],ratePerM2:area>0?total/area:0,rules};
@@ -249,9 +310,12 @@ function App(){
     {group:"Budget",keys:["pine_budget"]},
   ];
   const balStyles=[
-    {key:"none",label:"None"},{key:"madison",label:"Madison"},
-    {key:"santa_rosa",label:"Santa Rosa"},{key:"antigua",label:"Antigua (glass)"},
-    {key:"martinique",label:"Martinique"},{key:"wire",label:"Wire tension"},
+    {key:"none",label:"No"},
+    {key:"madison",label:"Madison"},
+    {key:"santa_rosa",label:"Santa Rosa"},
+    {key:"antigua",label:"Antigua (glass)"},
+    {key:"martinique",label:"Martinique"},
+    {key:"wire",label:"Wire tension"},
     {key:"rendered",label:"Rendered panel"},
   ];
   const PROJECT_TYPES=["Deck","Pergola","Cabana","Gazebo","Shed","Carport","Garage","Extension","Renovation"];
@@ -341,6 +405,10 @@ function App(){
                 React.createElement("div",{style:{fontSize:11,color:"#888",marginTop:2}},s))
             )
           ),
+          form.deckLevel==="ground"&&form.stairType==="none"&&React.createElement("div",{style:{background:"#FFF9E6",borderRadius:8,padding:"8px 10px",marginTop:8,marginBottom:4,fontSize:12,color:"#665500",display:"flex",gap:6,lineHeight:1.5}},
+            React.createElement("span",{style:{flexShrink:0}},"ⓘ"),
+            "Your deck sits 270mm above flat ground — I've allowed for one step in the estimate."
+          ),
           form.deckLevel==="raised"&&React.createElement("div",{style:{background:"#FAFAFA",borderRadius:12,padding:12,marginTop:8}},
             React.createElement("div",{style:{fontSize:13,fontWeight:600,marginBottom:8}},"Height above ground"),
             React.createElement("div",{style:{display:"flex",gap:8,alignItems:"center"}},
@@ -349,7 +417,23 @@ function App(){
               React.createElement("button",{style:{width:44,height:44,border:`1px solid ${BD}`,borderRadius:10,fontSize:22,background:"white"},onClick:()=>upd("heightMm",Number(form.heightMm)+100)},"+")
             ),
             React.createElement("div",{style:{fontSize:11,color:"#888",marginTop:8,textAlign:"center"}},
-              `${est.rules.nSteps} risers @ ${est.rules.riser}mm each · ${est.rules.high?"⚠ Upgraded specs required (>1800mm)":"Standard specs apply"}`)
+              `${est.rules.nSteps} risers @ ${est.rules.riser}mm each · ${est.rules.high?"⚠ Upgraded specs required (>1800mm)":"Standard specs apply"}`),
+            Number(form.heightMm)>=1000&&form.balustradeType==="none"&&React.createElement("div",{style:{background:"#FEF2F2",borderRadius:8,padding:"8px 10px",marginTop:8,fontSize:12,color:"#991B1B",display:"flex",gap:6,lineHeight:1.5}},
+              React.createElement("span",{style:{flexShrink:0}},"⚠"),
+              "At this height a balustrade is required by the NCC. It is not included in your estimate — owner to supply and install to comply."
+            ),
+            Number(form.heightMm)>=730&&Number(form.heightMm)<1000&&form.balustradeType==="none"&&React.createElement("div",{style:{background:"#FFF9E6",borderRadius:8,padding:"8px 10px",marginTop:8,fontSize:12,color:"#665500",display:"flex",gap:6,lineHeight:1.5}},
+              React.createElement("span",{style:{flexShrink:0}},"ⓘ"),
+              "No balustrade included in estimate."
+            ),
+            Number(form.heightMm)>=270&&Number(form.heightMm)<730&&form.stairType==="none"&&React.createElement("div",{style:{background:"#FFF9E6",borderRadius:8,padding:"8px 10px",marginTop:8,fontSize:12,color:"#665500",display:"flex",gap:6,lineHeight:1.5}},
+              React.createElement("span",{style:{flexShrink:0}},"ⓘ"),
+              "I've allowed for stairs for this height."
+            ),
+            Number(form.heightMm)>=270&&Number(form.heightMm)<730&&form.stairType!=="none"&&React.createElement("div",{style:{background:"#F0FDF4",borderRadius:8,padding:"8px 10px",marginTop:8,fontSize:12,color:"#166534",display:"flex",gap:6,lineHeight:1.5}},
+              React.createElement("span",{style:{flexShrink:0}},"✓"),
+              "I've allowed for stairs in this design."
+            )
           )
         )),
         card(React.createElement("div",null,
@@ -396,7 +480,7 @@ function App(){
               React.createElement("button",{style:{width:38,height:38,border:`1px solid ${BD}`,borderRadius:9,fontSize:18,background:"white"},onClick:()=>upd("stairWidthMm",Math.min((Number(form.stairWidthMm)||1200)+100,parseFloat(form.length)*1000))},"+")
             ),
             React.createElement("div",{style:{fontSize:11,color:"#888",marginTop:6,textAlign:"center"}},
-              `${est.rules.nSteps} risers @ ${est.rules.riser}mm · max width ${parseFloat(form.length)*1000}mm`)
+              `${est.rules.nSteps} risers @ ${est.rules.riser}mm · 300mm going · max width ${Math.round(parseFloat(form.length)*1000)}mm`)
           )
         )),
         React.createElement(PBtn,{label:"See my layout →",onClick:()=>go(3)}),
@@ -407,29 +491,94 @@ function App(){
       screen===4&&React.createElement("div",{className:"fade"},
         jeff(`Your ${form.length}m × ${form.width}m ${form.projectType}`,"Adjust the layout — board direction, stairs and features."),
         card(React.createElement("div",null,
-          React.createElement("svg",{width:"100%",viewBox:"0 0 300 230",style:{display:"block",background:"#F5EFD8",borderRadius:8,marginBottom:10}},
-            React.createElement("defs",null,React.createElement("clipPath",{id:"dc"},React.createElement("rect",{x:40,y:30,width:220,height:160}))),
-            React.createElement("rect",{x:40,y:30,width:220,height:160,fill:"#F5EFD8",stroke:"#111",strokeWidth:2}),
-            ...(()=>{
-              const bw=BOARDS[form.deckingType||"merbau"].w;
+          React.createElement("div",{style:{position:"relative",marginBottom:10}},React.createElement("svg",{width:"100%",viewBox:(()=>{
               const L=parseFloat(form.length)||5,D=parseFloat(form.width)||4;
-              const centresPx=(bw+6)/1000*(form.layoutBoard==="EW"?160/D:220/L);
-              const lines=[];
-              if(form.layoutBoard==="EW"){for(let y=30+centresPx;y<190;y+=centresPx)lines.push(React.createElement("line",{key:y,x1:40,y1:y,x2:260,y2:y,stroke:"#C8BC9A",strokeWidth:Math.max(1.5,centresPx*0.55),clipPath:"url(#dc)"}));}
-              else{for(let x=40+centresPx;x<260;x+=centresPx)lines.push(React.createElement("line",{key:x,x1:x,y1:30,x2:x,y2:190,stroke:"#C8BC9A",strokeWidth:Math.max(1.5,centresPx*0.55),clipPath:"url(#dc)"}));}
+              const ratio=L/D;
+              // Keep deck proportional — max 280px wide, scale height accordingly
+              const deckW=Math.min(280,Math.max(140,280));
+              const deckH=Math.min(200,Math.max(80,Math.round(deckW/ratio)));
+              const vw=deckW+60,vh=deckH+60;
+              return `0 0 ${vw} ${vh}`;
+            })(),style:{display:"block",background:"#FAFAFA",borderRadius:8}},
+            ...(()=>{
+              const L=parseFloat(form.length)||5,D=parseFloat(form.width)||4;
+              const ratio=L/D;
+              const deckW=Math.min(280,Math.max(140,280));
+              const deckH=Math.min(200,Math.max(80,Math.round(deckW/ratio)));
+              const vw=deckW+60,vh=deckH+60;
+              const ox=30,oy=30;
+              const bw=BOARDS[form.deckingType||"merbau"].w;
+              const scX=deckW/L,scY=deckH/D;
+              const centresPx=(bw+6)/1000*(form.layoutBoard==="EW"?scY:scX);
+              const lines=[
+                React.createElement("rect",{key:"bg",x:ox,y:oy,width:deckW,height:deckH,fill:"#F5EFD8",stroke:"#111",strokeWidth:2}),
+                React.createElement("defs",null,React.createElement("clipPath",{id:"dc"},React.createElement("rect",{x:ox,y:oy,width:deckW,height:deckH}))),
+              ];
+              if(form.layoutBoard==="EW"){for(let y=oy+centresPx;y<oy+deckH;y+=centresPx)lines.push(React.createElement("line",{key:y,x1:ox,y1:y,x2:ox+deckW,y2:y,stroke:"#C8BC9A",strokeWidth:Math.max(1.5,centresPx*0.55),clipPath:"url(#dc)"}));}
+              else{for(let x=ox+centresPx;x<ox+deckW;x+=centresPx)lines.push(React.createElement("line",{key:x,x1:x,y1:oy,x2:x,y2:oy+deckH,stroke:"#C8BC9A",strokeWidth:Math.max(1.5,centresPx*0.55),clipPath:"url(#dc)"}));}
+              lines.push(React.createElement("rect",{key:"border",x:ox,y:oy,width:deckW,height:deckH,fill:"none",stroke:"#111",strokeWidth:2}));
+              // Compass labels
+              lines.push(React.createElement("text",{key:"N",x:ox+deckW/2,y:oy-8,textAnchor:"middle",fontSize:10,fill:"#bbb"},"N"));
+              lines.push(React.createElement("text",{key:"S",x:ox+deckW/2,y:oy+deckH+16,textAnchor:"middle",fontSize:10,fill:"#bbb"},"S"));
+              lines.push(React.createElement("text",{key:"W",x:ox-10,y:oy+deckH/2+4,textAnchor:"middle",fontSize:10,fill:"#bbb"},"W"));
+              lines.push(React.createElement("text",{key:"E",x:ox+deckW+10,y:oy+deckH/2+4,textAnchor:"middle",fontSize:10,fill:"#bbb"},"E"));
+              // Dimension labels
+              lines.push(React.createElement("text",{key:"dimL",x:ox+deckW/2,y:oy+deckH+28,textAnchor:"middle",fontSize:9,fill:"#888"},`${form.length}m`));
+              lines.push(React.createElement("text",{key:"dimD",x:ox+deckW+24,y:oy+deckH/2+4,textAnchor:"middle",fontSize:9,fill:"#888",transform:`rotate(-90,${ox+deckW+24},${oy+deckH/2})`},`${form.width}m`));
+
+              // Stairs
+              if(form.stairType!=="none"){
+                const sp=form.layoutStairs||"S";
+                const isNS=sp==="S"||sp==="N";
+                const actualWmm=form.layoutStairsFull?(isNS?L*1000:D*1000):Math.min(Number(form.stairWidthMm)||1200,isNS?L*1000:D*1000);
+                const stWpx=isNS?Math.min(actualWmm/1000*scX,deckW-4):Math.min(actualWmm/1000*scY,deckH-4);
+                const stH=16;
+                const sxC=ox+(deckW-stWpx)/2, syC=oy+(deckH-stWpx)/2;
+                const coords={S:[sxC,oy+deckH,stWpx,stH],N:[sxC,oy-stH,stWpx,stH],E:[ox+deckW,syC,stH,stWpx],W:[ox-stH,syC,stH,stWpx]};
+                const[rx,ry,rw,rh]=coords[sp]||coords.S;
+                lines.push(React.createElement("rect",{key:"stair",x:rx,y:ry,width:rw,height:rh,fill:Y,stroke:"#111",strokeWidth:1.5,rx:2}));
+                if(isNS)lines.push(React.createElement("text",{key:"stairLabel",x:rx+rw/2,y:ry+11,textAnchor:"middle",fontSize:8,fill:"#555"},"stairs"));
+              }
+
+              // BBQ / Alfresco
+              if((form.placements||{}).bbq){
+                const bw2=Math.min(54,deckW*0.25),bh2=Math.min(38,deckH*0.3);
+                lines.push(React.createElement("rect",{key:"bbq",x:ox+deckW-bw2-4,y:oy+4,width:bw2,height:bh2,rx:4,fill:"#FFF0C0",stroke:"#E0A800",strokeWidth:1.5}));
+                lines.push(React.createElement("text",{key:"bbqL",x:ox+deckW-bw2/2-4,y:oy+bh2/2+8,textAnchor:"middle",fontSize:9,fill:"#7A5800",fontWeight:"bold"},"BBQ"));
+              }
+              if((form.placements||{}).alfresco){
+                const aw=Math.min(80,deckW*0.35),ah=Math.min(38,deckH*0.3);
+                lines.push(React.createElement("rect",{key:"alf",x:ox+4,y:oy+4,width:aw,height:ah,rx:4,fill:"#E0F4FF",stroke:"#4AABDE",strokeWidth:1.5}));
+                lines.push(React.createElement("text",{key:"alfL",x:ox+aw/2+4,y:oy+ah/2+8,textAnchor:"middle",fontSize:9,fill:"#1A5F7A",fontWeight:"bold"},"Alfresco"));
+              }
               return lines;
-            })(),
-            React.createElement("rect",{x:40,y:30,width:220,height:160,fill:"none",stroke:"#111",strokeWidth:2}),
-            ["N","S","W","E"].map((d,i)=>React.createElement("text",{key:d,x:[150,150,32,270][i],y:[24,210,114,114][i],textAnchor:"middle",fontSize:10,fill:"#bbb"},d)),
+            })()
+          )),
             form.stairType!=="none"&&(()=>{
               const L=parseFloat(form.length)||5;
-              const stWpx=form.layoutStairsFull?220:Math.min((form.stairWidthMm||1200)/1000*(220/L),220);
-              const sp=form.layoutStairs||"S",sx=40+(220-stWpx)/2;
-              const positions={S:[sx,190,stWpx,18],N:[sx,12,stWpx,18],E:[260,30+(160-stWpx)/2,18,stWpx],W:[22,30+(160-stWpx)/2,18,stWpx]};
+              const D=parseFloat(form.width)||4;
+              const sp=form.layoutStairs||"S";
+              const isNS=sp==="S"||sp==="N";
+              // Actual stair width capped at deck dimension — matches estimate engine
+              const actualWmm=form.layoutStairsFull
+                ?(isNS?L*1000:D*1000)
+                :Math.min(Number(form.stairWidthMm)||1200, isNS?L*1000:D*1000);
+              // Scale to SVG proportionally: 220px=L, 160px=D
+              const stWpx=isNS
+                ?Math.min(actualWmm/1000*(220/L),218)
+                :Math.min(actualWmm/1000*(160/D),158);
+              const sx=40+(220-stWpx)/2;
+              const sy=30+(160-stWpx)/2;
+              const positions={
+                S:[sx,190,stWpx,18],
+                N:[sx,12,stWpx,18],
+                E:[260,sy,18,stWpx],
+                W:[22,sy,18,stWpx]
+              };
               const[rx,ry,rw,rh]=positions[sp]||positions.S;
               return React.createElement("g",null,
                 React.createElement("rect",{x:rx,y:ry,width:rw,height:rh,fill:Y,stroke:"#111",strokeWidth:1.5,rx:2}),
-                React.createElement("text",{x:rx+rw/2,y:ry+rh/2+4,textAnchor:"middle",fontSize:8,fill:"#555"},"stairs")
+                isNS&&React.createElement("text",{x:rx+rw/2,y:ry+11,textAnchor:"middle",fontSize:8,fill:"#555"},"stairs")
               );
             })(),
             (form.placements||{}).bbq&&React.createElement("g",null,React.createElement("rect",{x:198,y:36,width:54,height:38,rx:4,fill:"#FFF0C0",stroke:"#E0A800",strokeWidth:1.5}),React.createElement("text",{x:225,y:59,textAnchor:"middle",fontSize:9,fill:"#7A5800",fontWeight:"bold"},"BBQ")),
@@ -509,7 +658,11 @@ function App(){
             React.createElement("span",{style:{fontSize:12,color:"#888"}},"$",Math.round(est.ratePerM2),"/m²"),
             React.createElement("span",{style:{fontSize:34,fontWeight:700}},"$",Math.round(est.total).toLocaleString())
           ),
-          React.createElement("div",{style:{fontSize:11,color:"#ccc",marginTop:6}},"Merbau priced from Bunnings. Other items indicative — live pricing coming soon.")
+          React.createElement("div",{style:{fontSize:11,color:"#ccc",marginTop:6}},"Merbau priced from Bunnings. Other items indicative — live pricing coming soon."),
+          React.createElement("div",{style:{background:"#F7F7F7",borderRadius:8,padding:"10px 12px",marginTop:10,fontSize:11,color:"#888",lineHeight:1.6,borderLeft:"3px solid #E5E5E5"}},
+            React.createElement("b",{style:{color:"#666"}},"Note on quantities: "),
+            "Bearer and footing counts are calculated at nominal 1800mm centres from centreline out. Final quantities are subject to site set-out — edge bearer positions and exact spacings are confirmed on site. The $21 full report includes a detailed set-out calculation, exact bearer positions, blocking specification and a technical set-out guide you can take to site."
+          )
         )),
 
         // Unlock card

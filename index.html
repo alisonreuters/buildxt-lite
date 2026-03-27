@@ -422,10 +422,7 @@ function App(){
               React.createElement("span",{style:{flexShrink:0}},"⚠"),
               "At this height a balustrade is required by the NCC. It is not included in your estimate — owner to supply and install to comply."
             ),
-            screen===3&&Number(form.heightMm)>=730&&Number(form.heightMm)<1000&&form.balustradeType==="none"&&React.createElement("div",{style:{background:"#FFF9E6",borderRadius:8,padding:"8px 10px",marginTop:8,fontSize:12,color:"#665500",display:"flex",gap:6,lineHeight:1.5}},
-              React.createElement("span",{style:{flexShrink:0}},"ⓘ"),
-              "No balustrade included in estimate."
-            ),
+
             screen===3&&Number(form.heightMm)>=270&&Number(form.heightMm)<730&&form.stairType==="none"&&React.createElement("div",{style:{background:"#FFF9E6",borderRadius:8,padding:"8px 10px",marginTop:8,fontSize:12,color:"#665500",display:"flex",gap:6,lineHeight:1.5}},
               React.createElement("span",{style:{flexShrink:0}},"ⓘ"),
               "I've allowed for stairs for this height."

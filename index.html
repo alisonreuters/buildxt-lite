@@ -83,7 +83,7 @@ const P={
 function structRules(L,D,hmm,hasBal,boardDir){
   const high=hmm>1800;
   const maxPostSpacing=high?1.5:1.8; // max post spacing along bearer
-  const maxBearerSpan=1.2;           // max bearer spacing (joist span)
+  const maxBearerSpan=1.8;           // max bearer spacing — joists span between bearers (AS1684)
 
   // Board direction determines bearer/joist orientation:
   // E-W boards → joists run N-S → bearers run E-W → posts along E-W at maxPostSpacing
@@ -134,6 +134,7 @@ function structRules(L,D,hmm,hasBal,boardDir){
   const nJoists=Math.ceil(joistRun/0.45)+1;
   const joistLmTotal=Math.ceil(nJoists*joistSpan);
 
+  // Stair riser — ceil(hmm/180) guarantees riser never exceeds 180mm (AS1657)
   const nSteps=hmm>0?Math.ceil(hmm/180):0;
   const riser=nSteps>0?Math.round(hmm/nSteps):160;
 

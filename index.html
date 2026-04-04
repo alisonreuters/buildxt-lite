@@ -145,7 +145,7 @@ function structRules(L,D,hmm,hasBal,boardDir){
     joistLmTotal,totalBearerLm,
     bearerRunLength,isEW,
     dblBearer:hasBal,high,maxPostSpacing,
-    nFootings,nSteps,riser,
+    nFootings,nSteps,riser,going:300,stairRun:nSteps*300,
     bearerDesc:hasBal?"2/140×45 H4 perimeter (balustrade) + 140×45 internal":"140×45 H4 MGP10"
   };
 }
@@ -488,12 +488,25 @@ function App(){
           ),
           form.stairType!=="none"&&React.createElement("div",null,
             React.createElement("div",{style:{display:"flex",gap:8,alignItems:"center"}},
-              React.createElement("button",{style:{width:38,height:38,border:`1px solid ${BD}`,borderRadius:9,fontSize:18,background:"white"},onClick:()=>upd("stairWidthMm",Math.max(900,Number(form.stairWidthMm)-100))},"-"),
-              React.createElement("div",{style:{flex:1,textAlign:"center",fontWeight:700,fontSize:15}},Math.min(form.stairWidthMm||1200,parseFloat(form.length)*1000),"mm wide"),
-              React.createElement("button",{style:{width:38,height:38,border:`1px solid ${BD}`,borderRadius:9,fontSize:18,background:"white"},onClick:()=>upd("stairWidthMm",Math.min((Number(form.stairWidthMm)||1200)+100,parseFloat(form.length)*1000))},"+")
+              React.createElement("button",{style:{width:38,height:38,border:`1px solid ${BD}`,borderRadius:9,fontSize:18,background:"white"},
+                onClick:()=>upd("stairWidthMm",Math.max(900,Number(form.stairWidthMm)-100))},"-"),
+              React.createElement("div",{style:{flex:1,textAlign:"center",fontWeight:700,fontSize:15}},
+                (()=>{
+                  const maxW=(form.layoutStairs==="E"||form.layoutStairs==="W")
+                    ?parseFloat(form.width)*1000
+                    :parseFloat(form.length)*1000;
+                  return Math.min(form.stairWidthMm||1200,maxW);
+                })(),"mm wide"),
+              React.createElement("button",{style:{width:38,height:38,border:`1px solid ${BD}`,borderRadius:9,fontSize:18,background:"white"},
+                onClick:()=>{
+                  const maxW=(form.layoutStairs==="E"||form.layoutStairs==="W")
+                    ?parseFloat(form.width)*1000
+                    :parseFloat(form.length)*1000;
+                  upd("stairWidthMm",Math.min((Number(form.stairWidthMm)||1200)+100,maxW));
+                }},"+")
             ),
             React.createElement("div",{style:{fontSize:11,color:"#888",marginTop:6,textAlign:"center"}},
-              `${est.rules.nSteps} risers @ ${est.rules.riser}mm · 300mm going · max width ${Math.round(parseFloat(form.length)*1000)}mm`)
+              `${est.rules.nSteps} risers @ ${est.rules.riser}mm · 300mm going · stair run ${est.rules.nSteps*300}mm · max width ${Math.round(parseFloat(form.length)*1000)}mm`)
           )
         )),
         screen===3&&React.createElement(PBtn,{label:"See my layout →",onClick:()=>go(3)}),

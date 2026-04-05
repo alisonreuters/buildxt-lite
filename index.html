@@ -548,7 +548,7 @@ function App(){
           // NS boards: bearers are NS (vertical), spaced along L
           const maxBSpacing=Number(form.heightMm)>1800?1.5:1.8;
           const bearerSpanDim=isEW?D:L;
-          const nBRows=Math.ceil(bearerSpanDim/1.2)+1;
+          const nBRows=Math.ceil(bearerSpanDim/1.8)+1;
           const bearerLines=[];
           for(let i=0;i<nBRows;i++){
             const pos=(i/(Math.max(1,nBRows-1)))*bearerSpanDim*scaleToFit;

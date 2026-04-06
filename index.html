@@ -923,34 +923,60 @@ function App(){
                     stroke:"#B8B060",strokeWidth:0.6}))
               ),
 
-              // ── STAIRS (stepping down from FFL to ground) ────────
+              // ── STAIRS — diagonal stringer + open treads per sketch ──
+              // Stringer: solid diagonal timber from deck edge (FFL) to ground
+              // Treads: horizontal boards ON stringer, 300mm going, riser height apart
+              // Open underneath — no riser boards
               hasStairRight&&React.createElement("g",null,
-                ...[...Array(nRisers)].map((_,i)=>React.createElement("g",{key:`st${i}`},
-                  React.createElement("rect",{
-                    x:OX+DK_PX+i*going*HS, y:FFL_Y+i*riser*VS,
-                    width:going*HS, height:Math.max(4,DK_H*VS),
-                    fill:"#C8A050",stroke:"#806820",strokeWidth:0.7}),
-                  React.createElement("rect",{
-                    x:OX+DK_PX+i*going*HS, y:FFL_Y+i*riser*VS,
-                    width:Math.max(4,FAC_W*HS), height:riser*VS,
-                    fill:"#8B5530",stroke:"#5B3010",strokeWidth:0.6})
-                ))
+                (()=>{
+                  const x1=OX+DK_PX, y1=FFL_Y;       // top of stringer (at deck)
+                  const x2=OX+DK_PX+stairRun*HS, y2=GY; // bottom of stringer (at ground)
+                  const dx=x2-x1, dy=y2-y1;
+                  const len=Math.sqrt(dx*dx+dy*dy);
+                  const strD=Math.max(10,90*HS);      // stringer depth in px (~90mm timber)
+                  const nx=dy/len*strD, ny=-dx/len*strD; // offset normal to stringer
+                  const poly=`${x1},${y1} ${x1+nx},${y1+ny} ${x2+nx},${y2+ny} ${x2},${y2}`;
+                  const treads=[...Array(nRisers)].map((_,i)=>
+                    React.createElement("rect",{key:`tr${i}`,
+                      x:x1+i*going*HS, y:y1+i*riser*VS,
+                      width:going*HS, height:Math.max(5,DK_H*VS*1.5),
+                      fill:"#C8A050",stroke:"#806820",strokeWidth:0.8})
+                  );
+                  const hatch=[1,2,3,4,5,6,7].map(t=>{
+                    const f=t/8;
+                    return React.createElement("line",{key:`ht${t}`,
+                      x1:x1+dx*f, y1:y1+dy*f,
+                      x2:x1+dx*f+nx, y2:y1+dy*f+ny,
+                      stroke:"#906820",strokeWidth:0.5,opacity:0.6});
+                  });
+                  return React.createElement("g",null,
+                    // Stringer
+                    React.createElement("polygon",{points:poly,
+                      fill:"#C8A050",stroke:"#806820",strokeWidth:0.9}),
+                    ...hatch,
+                    // Treads on top
+                    ...treads,
+                    // Small footing pad at stringer base
+                    React.createElement("rect",{
+                      x:x2-22,y:y2,width:44,height:Math.max(8,30*VS),
+                      fill:"#909098",stroke:"#686878",strokeWidth:0.7,rx:1})
+                  );
+                })()
               ),
-
               // ── FFL LINE ─────────────────────────────────────────
-              React.createElement("line",{x1:OX-32,y1:FFL_Y,
+              React.createElement("line",{x1:OX-50,y1:FFL_Y,
                 x2:OX+DK_PX+(hasStairRight?ST_PX:0)+12,y2:FFL_Y,
                 stroke:"#1850A0",strokeWidth:1,strokeDasharray:"6,3"}),
-              React.createElement("text",{x:OX-34,y:FFL_Y+4,textAnchor:"end",
+              React.createElement("text",{x:OX-52,y:FFL_Y+4,textAnchor:"end",
                 fontSize:10,fill:"#1850A0",fontWeight:700},"FFL"),
 
               // ── DIMENSION LINES ──────────────────────────────────
-              // Right: FFL height from GL
-              DV(OX+DK_PX+60,GY,FFL_Y,`${FFL}mm FFL`,true),
-              // Right: balustrade height
-              hasBal&&DV(OX+DK_PX+60,FFL_Y,BAL_TOP,`${BAL_H}mm`,true),
-              // Left: footing depth
-              DV(OX-56,PAD_TOP,PAD_BOT,"200mm",false),
+              // Left side: FFL height (avoids clash with stairs on right)
+              DV(OX-68,GY,FFL_Y,`${FFL}mm FFL`,false),
+              // Right: balustrade height only
+              hasBal&&DV(OX+DK_PX+60,FFL_Y,BAL_TOP,`${BAL_H}mm bal.`,true),
+              // Left: footing depth (further left)
+              DV(OX-88,PAD_TOP,PAD_BOT,"400mm deep",false),
 
               // Member depth indicators (left edge, small bracket style)
               ...[

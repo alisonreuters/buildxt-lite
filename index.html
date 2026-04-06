@@ -925,5 +925,110 @@ function App(){
         screen===5&&React.createElement(PBtn,{label:"See 3D set out →",onClick:()=>go(5)}),
         screen===5&&React.createElement(BackBtn,null)
       ),
+      // ── SCREEN 6: 3D Set out ────────────────────────────────────
+      screen===6&&React.createElement("div",{className:"fade"},
+        jeff("Your 3D set out"),
+        React.createElement("div",{style:{borderRadius:14,overflow:"hidden",marginBottom:12,background:"#111",position:"relative"}},
+          React.createElement("img",{src:render.src,alt:"3D set out of your deck",
+            style:{width:"100%",display:"block",borderRadius:14},
+            onError:e=>{e.target.style.display="none"}}),
+          React.createElement("div",{style:{background:"#1A1A1A",padding:"10px 14px",display:"flex",flexWrap:"wrap",gap:6}},
+            [form.deckLevel==="raised"?`Raised ${form.heightMm}mm`:"Ground level",
+             `${BOARDS[form.deckingType||"merbau"].label} decking`,
+             form.stairType!=="none"?`${est.rules.nSteps} risers @ ${est.rules.riser}mm`:"No stairs",
+             form.balustradeType!=="none"?form.balustradeType+" balustrade":"Open deck"
+            ].map(tag=>React.createElement("div",{key:tag,style:{background:Y,color:TX,fontSize:11,fontWeight:600,padding:"3px 10px",borderRadius:20}},tag))
+          )
+        ),
+        form.siteCondition==="work"&&warn("Site levelling not included in estimate — allow additional budget."),
+        form.poolAdjacent&&warn("Pool fence rules apply (AS1926.1) — 1200mm min height, self-closing gate required."),
+        est.rules.high&&warn(`Deck height ${form.heightMm}mm exceeds 1800mm — upgraded to 140×45 joists and 1500mm post spacing.`,"#7C3500","#FFF7ED"),
+        React.createElement("div",{style:{background:"white",borderRadius:12,border:`1px solid ${BD}`,padding:12,marginBottom:12,fontSize:12,color:"#666",lineHeight:1.7}},
+          React.createElement("b",{style:{color:TX}},"Structure: "),
+          `${est.rules.nFootings} footings · ${est.rules.nBearerRows} bearer rows × ${est.rules.nPostsPerBearer} posts · ${est.rules.joistLabel} joists`
+        ),
+        screen===6&&React.createElement(PBtn,{label:"See my estimate →",onClick:()=>go(6)}),
+        screen===6&&React.createElement(BackBtn,null)
+      ),
 
+      // ── SCREEN 7: Estimate + Save ───────────────────────────────
+      screen===7&&React.createElement("div",{className:"fade"},
+        jeff("Your estimate"),
+        card(React.createElement("div",{style:{textAlign:"center"}},
+          React.createElement("div",{style:{fontSize:12,color:"#aaa",marginBottom:4}},"Budget estimate — materials + labour"),
+          React.createElement("div",{style:{fontSize:48,fontWeight:700,color:TX,letterSpacing:-2}},"$",Math.round(est.total).toLocaleString()),
+          React.createElement("div",{style:{fontSize:13,color:"#888",marginTop:4}},"$",Math.round(est.ratePerM2),"/m² · ",est.area.toFixed(1)," m²"),
+          React.createElement("div",{style:{fontSize:11,color:"#bbb",marginTop:4}},form.postcode," · Wind ",wind.region," · ",wind.terrain)
+        )),
+        card(React.createElement("div",null,
+          React.createElement("div",{style:{fontSize:13,fontWeight:600,marginBottom:12}},"Cost breakdown"),
+          est.cats.map(cat=>React.createElement("div",{key:cat,style:{marginBottom:14}},
+            React.createElement("div",{style:{fontSize:11,fontWeight:600,color:"#bbb",textTransform:"uppercase",letterSpacing:1,marginBottom:4}},cat),
+            est.items.filter(i=>i.cat===cat).map(i=>React.createElement("div",{key:i.label,style:{display:"flex",justifyContent:"space-between",fontSize:13,padding:"4px 0",borderBottom:"1px solid #f5f5f5"}},
+              React.createElement("span",{style:{color:"#555",flex:1,paddingRight:8}},i.label,i.note?React.createElement("span",{style:{fontSize:10,color:"#ccc",marginLeft:4}},i.note):""),
+              React.createElement("span",{style:{fontWeight:500}},"$",Math.round((i.qty||0)*(i.rate||0)).toLocaleString())
+            ))
+          )),
+          React.createElement("div",{style:{borderTop:`2px solid ${TX}`,paddingTop:8,display:"flex",justifyContent:"space-between",alignItems:"baseline"}},
+            React.createElement("span",{style:{fontSize:12,color:"#888"}},"$",Math.round(est.ratePerM2),"/m²"),
+            React.createElement("span",{style:{fontSize:34,fontWeight:700}},"$",Math.round(est.total).toLocaleString())
+          ),
+          React.createElement("div",{style:{fontSize:11,color:"#ccc",marginTop:6}},"Merbau priced from Bunnings. Other items indicative — live pricing coming soon."),
+          React.createElement("div",{style:{background:"#F7F7F7",borderRadius:8,padding:"10px 12px",marginTop:10,fontSize:11,color:"#888",lineHeight:1.6,borderLeft:"3px solid #E5E5E5"}},
+            React.createElement("b",{style:{color:"#666"}},"Note on quantities: "),
+            "Bearer and footing counts are calculated at nominal 1800mm centres from centreline out. Final quantities are subject to site set-out. The $21 full report includes detailed set-out calculation and a technical guide you can take to site."
+          )
+        )),
+        card(React.createElement("div",null,
+          React.createElement("div",{style:{fontSize:14,fontWeight:600,marginBottom:10}},"Unlock your full project report"),
+          [["Itemised live pricing","Current material & labour rates for your area"],
+           ["Materials shopping list","Print or email to your supplier"],
+           ["Full 3D set out render","Photorealistic cutaway of your build"],
+           ["Build guide access","Technical library for 14 days"]
+          ].map(([t,d])=>React.createElement("div",{key:t,style:{display:"flex",gap:10,marginBottom:10,alignItems:"flex-start"}},
+            React.createElement("div",{style:{width:26,height:26,borderRadius:13,background:Y,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:11,fontWeight:700}},"✓"),
+            React.createElement("div",null,React.createElement("div",{style:{fontSize:13,fontWeight:500}},t),React.createElement("div",{style:{fontSize:12,color:"#888"}},d))
+          ))
+        )),
+        React.createElement("button",{style:{width:"100%",height:54,borderRadius:14,fontWeight:700,fontSize:17,background:Y,border:"none",marginBottom:16}},"Unlock full project — $21"),
 
+        saveState==="idle"&&React.createElement("div",{style:{background:"white",borderRadius:14,border:`1px solid ${BD}`,padding:16,marginBottom:8}},
+          React.createElement("div",{style:{fontSize:14,fontWeight:600,marginBottom:4}},"Want to save this project and come back to it?"),
+          React.createElement("div",{style:{fontSize:13,color:"#777",marginBottom:12,lineHeight:1.5}},"Store multiple projects, track your estimates and share with your builder — just add your name and email and we'll send you a sign-in link. No password needed."),
+          React.createElement("button",{onClick:()=>setSaveState("asking"),style:{width:"100%",height:44,borderRadius:10,fontWeight:600,fontSize:14,background:"#F7F7F7",border:`1px solid ${BD}`,color:TX}},"Save my project →")
+        ),
+
+        saveState==="asking"&&React.createElement("div",{style:{background:"white",borderRadius:14,border:`1.5px solid ${Y}`,padding:16,marginBottom:8}},
+          React.createElement("div",{style:{fontSize:14,fontWeight:600,marginBottom:12}},"Save your project"),
+          React.createElement("input",{value:saveName,onChange:e=>setSaveName(e.target.value),placeholder:"Your first name",
+            style:{width:"100%",height:46,border:`1px solid ${BD}`,borderRadius:10,padding:"0 12px",fontSize:15,marginBottom:8}}),
+          React.createElement("input",{type:"email",value:saveEmail,onChange:e=>setSaveEmail(e.target.value),placeholder:"Your email address",
+            style:{width:"100%",height:46,border:`1px solid ${BD}`,borderRadius:10,padding:"0 12px",fontSize:15,marginBottom:12}}),
+          React.createElement("button",{onClick:sendMagicLink,disabled:!saveEmail.trim()||!saveName.trim(),
+            style:{width:"100%",height:46,borderRadius:10,fontWeight:700,fontSize:15,background:Y,border:"none",opacity:(!saveEmail.trim()||!saveName.trim())?0.5:1}},
+            "Send me a sign-in link"),
+          React.createElement("div",{style:{fontSize:11,color:"#aaa",textAlign:"center",marginTop:8}},"We'll email you a link — click it and you're straight in. No password ever.")
+        ),
+
+        saveState==="sending"&&React.createElement("div",{style:{background:"white",borderRadius:14,border:`1px solid ${BD}`,padding:24,textAlign:"center",marginBottom:8}},
+          React.createElement("div",{style:{width:24,height:24,border:`3px solid ${BD}`,borderTopColor:Y,borderRadius:"50%",margin:"0 auto 12px"},className:"spin"}),
+          React.createElement("div",{style:{fontSize:14,color:"#666"}},"Sending your sign-in link...")
+        ),
+
+        saveState==="sent"&&React.createElement("div",{style:{background:"#F0FDF4",borderRadius:14,border:"1px solid #86EFAC",padding:16,textAlign:"center",marginBottom:8}},
+          React.createElement("div",{style:{fontSize:24,marginBottom:8}},"✓"),
+          React.createElement("div",{style:{fontSize:15,fontWeight:600,color:"#166534",marginBottom:4}},"Check your email"),
+          React.createElement("div",{style:{fontSize:13,color:"#4B7B58",lineHeight:1.5}},`We've sent a sign-in link to ${saveEmail}. Click it and your project will be waiting for you.`)
+        ),
+
+        React.createElement("button",{onClick:()=>setScreen(1),style:{background:"none",border:"none",fontSize:13,color:"#bbb",textDecoration:"underline",display:"block",margin:"8px auto 0"}},"Start a new project"),
+        screen===7&&React.createElement(BackBtn,null)
+      )
+    )
+  );
+}
+
+ReactDOM.render(React.createElement(App),document.getElementById("root"));
+</script>
+</body>
+</html>

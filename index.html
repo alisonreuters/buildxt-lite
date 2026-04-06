@@ -730,24 +730,22 @@ function App(){
           // Member sizes mm
           const DK_H=19; const JT_H=90; const BR_H=140;
           const PIR_W=100; const PAD_H=400; const PAD_W=400;
-          const FAC_T=19;  // facia thickness (same as decking)
-          const FAC_W=JT_H+DK_H; // facia height covers joist depth + deck overlap
-          const STR_H=300; // stringer timber depth (300×45)
+          const FAC_T=19;
           const BAL_H=hasBal?(FFL>=1000?1200:1000):0;
           const JT_SIZE=FFL>1800?140:90;
           const PIR_H=Math.max(50,FFL-BR_H-JT_H-DK_H);
 
-          // Canvas & scale — one horizontal scale drives everything
+          // Canvas — wider left margin for dims, less right margin (no labels there)
           const CVS_W=680;
-          const ML=90; const MR=160; const MT=30; const MB=50;
-          const DRAW_W=CVS_W-ML-MR; // 430px
+          const ML=115; const MR=80; const MT=30; const MB=50;
+          const DRAW_W=CVS_W-ML-MR; // 485px
           const totalHmm=Dm*1000+(hasStairRight?stairRun:0);
           const HS=DRAW_W/totalHmm;
           const deckWpx=Dm*1000*HS;
           const stRunPx=stairRun*HS;
           const OX=ML;
 
-          // Vertical — min pixel sizes for legibility, HS-derived
+          // Vertical sizes
           const MIN_MBR=Math.max(18,BR_H*HS);
           const MIN_JST=Math.max(12,JT_H*HS);
           const MIN_DKH=Math.max(5,DK_H*HS);
@@ -757,7 +755,7 @@ function App(){
           const TOP_SP=hasBal?BAL_PX:30;
           const CVS_H=Math.round(MT+TOP_SP+MIN_DKH+MIN_JST+MIN_MBR+PIR_PX+PAD_PX+MB+20);
 
-          // Y coordinates
+          // Y coords
           const GY=MT+TOP_SP+MIN_DKH+MIN_JST+MIN_MBR+PIR_PX;
           const PIR_TOP=GY-PIR_PX;
           const BR_BOT=PIR_TOP; const BR_TOP=PIR_TOP-MIN_MBR;
@@ -767,14 +765,14 @@ function App(){
           const BAL_TOP=hasBal?FFL_Y-BAL_PX:FFL_Y;
           const PAD_TOP=GY; const PAD_BOT=GY+PAD_PX;
 
-          // Dim line helpers
+          // Dim helpers
           const DV=(x,y1,y2,lbl,right=true)=>{
-            if(Math.abs(y2-y1)<5)return null;
-            const TX=right?x+28:x-28,MY=(y1+y2)/2;
+            if(Math.abs(y2-y1)<4)return null;
+            const TX=right?x+26:x-26,MY=(y1+y2)/2;
             return React.createElement("g",null,
-              React.createElement("line",{x1:x,y1:y1,x2:x,y2:y2,stroke:"#555",strokeWidth:0.7}),
-              React.createElement("line",{x1:x-4,y1:y1,x2:x+4,y2:y1,stroke:"#555",strokeWidth:0.7}),
-              React.createElement("line",{x1:x-4,y1:y2,x2:x+4,y2:y2,stroke:"#555",strokeWidth:0.7}),
+              React.createElement("line",{x1:x,y1:y1,x2:x,y2:y2,stroke:"#666",strokeWidth:0.7}),
+              React.createElement("line",{x1:x-4,y1:y1,x2:x+4,y2:y1,stroke:"#666",strokeWidth:0.7}),
+              React.createElement("line",{x1:x-4,y1:y2,x2:x+4,y2:y2,stroke:"#666",strokeWidth:0.7}),
               React.createElement("text",{x:TX,y:MY+4,textAnchor:"middle",fontSize:9,fill:"#444",
                 fontWeight:500,transform:`rotate(-90,${TX},${MY})`},lbl)
             );
@@ -782,9 +780,9 @@ function App(){
           const DH=(x1,x2,y,lbl,above=false)=>{
             const TY=above?y-12:y+14,TK=above?4:-4;
             return React.createElement("g",null,
-              React.createElement("line",{x1,y1:y,x2,y2:y,stroke:"#555",strokeWidth:0.7}),
-              React.createElement("line",{x1,y1:y-TK,x2:x1,y2:y+TK,stroke:"#555",strokeWidth:0.7}),
-              React.createElement("line",{x1:x2,y1:y-TK,x2,y2:y+TK,stroke:"#555",strokeWidth:0.7}),
+              React.createElement("line",{x1,y1:y,x2,y2:y,stroke:"#666",strokeWidth:0.7}),
+              React.createElement("line",{x1,y1:y-TK,x2:x1,y2:y+TK,stroke:"#666",strokeWidth:0.7}),
+              React.createElement("line",{x1:x2,y1:y-TK,x2,y2:y+TK,stroke:"#666",strokeWidth:0.7}),
               React.createElement("text",{x:(x1+x2)/2,y:TY,textAnchor:"middle",fontSize:9,fill:"#444",fontWeight:500},lbl)
             );
           };
@@ -799,26 +797,25 @@ function App(){
             React.createElement("svg",{width:"100%",viewBox:`0 0 ${CVS_W} ${CVS_H}`,
               style:{display:"block",background:"#F9F9F7",borderRadius:10,marginBottom:8}},
 
-              // Title
               React.createElement("text",{x:OX,y:18,fontSize:8,fill:"#bbb"},
                 `Section — ${Dm}m × ${Lm}m · FFL ${FFL}mm · ${boardDir} boards · ${nRisers} risers @ ${riser}mm · pier ${PIR_H}mm`),
 
-              // Soil hatch
+              // Soil
               React.createElement("rect",{x:OX-10,y:GY,
                 width:deckWpx+(hasStairRight?stRunPx:0)+20,height:PAD_PX+16,
                 fill:"#C8A87A",opacity:0.18}),
-              ...[0,1,2,3,4,5,6,7,8,9,10,11,12].map(i=>React.createElement("line",{key:`h${i}`,
+              ...[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14].map(i=>React.createElement("line",{key:`h${i}`,
                 x1:OX-10+i*30,y1:GY,x2:OX-10+i*30-15,y2:GY+PAD_PX+16,
                 stroke:"#9B8060",strokeWidth:0.3,opacity:0.5})),
 
               // Ground line
-              React.createElement("line",{x1:OX-60,y1:GY,
+              React.createElement("line",{x1:OX-80,y1:GY,
                 x2:OX+deckWpx+(hasStairRight?stRunPx:0)+18,y2:GY,
                 stroke:"#7A6040",strokeWidth:1.5}),
-              React.createElement("text",{x:OX-62,y:GY+4,textAnchor:"end",
+              React.createElement("text",{x:OX-82,y:GY+4,textAnchor:"end",
                 fontSize:10,fill:"#7A6040",fontWeight:700},"GL"),
 
-              // T-shaped footings
+              // T footings
               ...pierXs.map((px,i)=>React.createElement("g",{key:`foot${i}`},
                 React.createElement("rect",{x:px-PAD_W*HS/2,y:PAD_TOP+PAD_PX*0.25,
                   width:PAD_W*HS,height:PAD_PX*0.75,
@@ -828,7 +825,7 @@ function App(){
                   fill:"#A0A0B0",stroke:"#787888",strokeWidth:0.7})
               )),
 
-              // Piers above ground
+              // Piers
               ...pierXs.map((px,i)=>React.createElement("g",{key:`pier${i}`},
                 React.createElement("rect",{
                   x:px-Math.max(5,PIR_W*HS/2),y:PIR_TOP,
@@ -856,7 +853,7 @@ function App(){
                   fill:"#B89050",stroke:"#806820",strokeWidth:0.7});
               }),
 
-              // Decking boards
+              // Decking
               React.createElement("rect",{x:OX,y:DK_TOP,width:deckWpx,height:MIN_DKH,
                 fill:"#7B5030",stroke:"#5B3010",strokeWidth:0.8}),
               ...[...Array(Math.min(20,Math.ceil(Dm*1000/96)))].map((_,i)=>
@@ -864,22 +861,16 @@ function App(){
                   x1:OX+i*96*HS,y1:DK_TOP,x2:OX+i*96*HS,y2:FFL_Y,
                   stroke:"#6B4020",strokeWidth:0.5})),
 
-              // ── FACIA BOARDS — left and right edges ──────────────
-              // Two pieces: vertical covering joist end grain,
-              // deck board overlaps top by 15mm (drip edge)
+              // Facia — left and right edges
+              // Vertical piece covers joist end grain
+              // Deck board overlaps top 15mm (drip edge)
               ...[OX-Math.max(4,FAC_T*HS), OX+deckWpx].map((fx,side)=>
                 React.createElement("g",{key:`fac${side}`},
-                  // Vertical facia piece (covers joist end grain, same colour as decking)
-                  React.createElement("rect",{
-                    x:fx, y:JT_TOP,
-                    width:Math.max(4,FAC_T*HS),
-                    height:MIN_JST,
+                  React.createElement("rect",{x:fx,y:JT_TOP,
+                    width:Math.max(4,FAC_T*HS),height:MIN_JST,
                     fill:"#7B5030",stroke:"#5B3010",strokeWidth:0.7}),
-                  // Horizontal cap piece tucked under deck board (15mm overlap)
-                  React.createElement("rect",{
-                    x:fx, y:DK_TOP-Math.max(2,15*HS*0.5),
-                    width:Math.max(4,FAC_T*HS),
-                    height:MIN_DKH+Math.max(2,15*HS*0.5),
+                  React.createElement("rect",{x:fx,y:DK_TOP-Math.max(2,8*HS),
+                    width:Math.max(4,FAC_T*HS),height:MIN_DKH+Math.max(2,8*HS),
                     fill:"#7B5030",stroke:"#5B3010",strokeWidth:0.7})
                 )
               ),
@@ -898,86 +889,83 @@ function App(){
                     stroke:"#B8B060",strokeWidth:0.6}))
               ),
 
-              // ── STAIRS — notched stringer (300×45), open treads ──
-              // Stringer shown as zig-zag notched profile
-              // Uses uniform HS scale for correct angle
+              // ── STRINGER — solid 300×45 with notches cut from top ──
+              // Bottom edge = straight diagonal from deck edge to ground
+              // Top edge = notched step profile (zig-zag)
+              // Treads sit on each horizontal notch surface
               hasStairRight&&React.createElement("g",null,
                 (()=>{
-                  const stH=FFL*HS;
-                  const stW=stairRun*HS;
-                  const x0=OX+deckWpx; // start x at deck edge
-                  const y0=GY-stH;     // start y at FFL
-                  const gW=going*HS;
-                  const rH=riser*HS;
-                  const strD=Math.max(8,300*HS*0.4); // stringer depth ~300mm
+                  const gW=going*HS;   // going in px
+                  const rH=riser*HS;   // riser in px (uniform HS scale)
+                  const strD=Math.max(10,300*HS*0.5); // stringer depth 300mm
+                  const x0=OX+deckWpx; // deck right edge
+                  const y0=GY-FFL*HS;  // top of stringer = FFL above GL
 
-                  // Build zig-zag notched stringer path
-                  // Top edge follows steps, bottom edge is straight diagonal
+                  // Bottom edge: straight diagonal from (x0, y0+strD) to (x0+stW, GY+strD)
+                  const stW=stairRun*HS;
+                  const bx1=x0, by1=y0+strD;
+                  const bx2=x0+stW, by2=GY+strD;
+
+                  // Top edge: notched zig-zag
+                  // Starts at (x0, y0), steps right then down for each riser
                   const topPts=[[x0,y0]];
                   for(let i=0;i<nRisers;i++){
                     const tx=x0+i*gW, ty=y0+i*rH;
-                    topPts.push([tx+gW, ty]);      // horizontal (going)
-                    if(i<nRisers-1) topPts.push([tx+gW, ty+rH]); // vertical (riser)
+                    topPts.push([tx+gW, ty]);       // horizontal going
+                    topPts.push([tx+gW, ty+rH]);    // vertical riser drop
                   }
-                  topPts.push([x0+stW, GY]);
-
-                  // Bottom edge: offset the diagonal by strD
-                  const dx=stW, dy=stH;
-                  const len=Math.sqrt(dx*dx+dy*dy);
-                  const nx=(dy/len)*strD, ny=(-dx/len)*strD;
-                  const botPts=topPts.map(([px,py])=>[px+nx,py+ny]);
-
-                  const allPts=[...topPts,...botPts.slice().reverse()];
-                  const poly=allPts.map(p=>p.join(",")).join(" ");
+                  // Bottom edge points (reverse for polygon)
+                  const botPts=[[bx2,by2],[bx1,by1]];
+                  const allPts=[...topPts,...botPts];
+                  const poly=allPts.map(([px,py])=>`${px},${py}`).join(" ");
 
                   return React.createElement("g",null,
-                    // Notched stringer
+                    // Stringer solid body
                     React.createElement("polygon",{points:poly,
-                      fill:"#C8A050",stroke:"#806820",strokeWidth:0.9}),
-                    // Treads on horizontal notches
+                      fill:"#C8A050",stroke:"#806820",strokeWidth:1}),
+                    // Treads on horizontal notch surfaces
                     ...[...Array(nRisers)].map((_,i)=>
                       React.createElement("rect",{key:`tr${i}`,
                         x:x0+i*gW, y:y0+i*rH,
                         width:gW, height:Math.max(5,MIN_DKH*1.5),
-                        fill:"#C8A050",stroke:"#806820",strokeWidth:0.8})
+                        fill:"#C8A050",stroke:"#806820",strokeWidth:0.9})
                     ),
-                    // Footing at stringer base
-                    React.createElement("rect",{x:x0+stW-20,y:GY,
-                      width:40,height:Math.max(6,20*HS),
+                    // Small footing pad at base of stringer
+                    React.createElement("rect",{x:x0+stW-22,y:GY,
+                      width:44,height:Math.max(6,20*HS),
                       fill:"#909098",stroke:"#686878",strokeWidth:0.7,rx:1}),
                     // Angle label
                     React.createElement("text",{
-                      x:x0+stW*0.5+8,y:y0+stH*0.5-8,
+                      x:x0+stW*0.45,y:y0+FFL*HS*0.5+strD+10,
                       fontSize:8,fill:"#999"},`${stairAngleDeg}°`)
                   );
                 })()
               ),
 
               // FFL line
-              React.createElement("line",{x1:OX-70,y1:FFL_Y,
-                x2:OX+deckWpx+(hasStairRight?stRunPx:0)+12,y2:FFL_Y,
+              React.createElement("line",{x1:OX-95,y1:FFL_Y,
+                x2:OX+deckWpx+(hasStairRight?stRunPx:0)+10,y2:FFL_Y,
                 stroke:"#1850A0",strokeWidth:1,strokeDasharray:"6,3"}),
-              React.createElement("text",{x:OX-72,y:FFL_Y+4,textAnchor:"end",
+              React.createElement("text",{x:OX-97,y:FFL_Y+4,textAnchor:"end",
                 fontSize:10,fill:"#1850A0",fontWeight:700},"FFL"),
 
-              // ── DIMENSIONS — clean, numbers only on right ────────
-              // Right side: stacked dimension lines, numbers only
-              DV(OX+deckWpx+18,FFL_Y,JT_TOP,`${DK_H}`,true),
-              DV(OX+deckWpx+34,JT_TOP,BR_TOP,`${JT_H}`,true),
-              DV(OX+deckWpx+50,BR_TOP,PIR_TOP,`${BR_H}`,true),
-              DV(OX+deckWpx+66,GY,PIR_TOP,`${PIR_H}`,true),
-              hasBal&&DV(OX+deckWpx+18,BAL_TOP,FFL_Y,`${BAL_H}`,true),
+              // ── DIMENSIONS — ALL on left side now ────────────────
+              // Member depths stacked: 19 / 90 / 140 / pier / footing
+              DV(OX-18,DK_TOP,FFL_Y,`${DK_H}`,false),
+              DV(OX-32,JT_TOP,JT_BOT,`${JT_H}`,false),
+              DV(OX-46,BR_TOP,BR_BOT,`${BR_H}`,false),
+              DV(OX-62,PIR_TOP,GY,`${PIR_H}mm`,false),
+              DV(OX-78,PAD_TOP,PAD_BOT,"400",false),
+              // FFL total on far left
+              DV(OX-96,GY,FFL_Y,`${FFL}mm FFL`,false),
+              // Balustrade on right (only thing on right)
+              hasBal&&DV(OX+deckWpx+16,FFL_Y,BAL_TOP,`${BAL_H}mm`,true),
 
-              // Left side: FFL total and footing depth
-              DV(OX-72,GY,FFL_Y,`${FFL}mm FFL`,false),
-              DV(OX-88,PAD_TOP,PAD_BOT,"400mm",false),
-
-              // Bottom: deck width and stair run
+              // Bottom dims
               DH(OX,OX+deckWpx,PAD_BOT+18,`${Math.round(Dm*1000)}mm`,false),
               hasStairRight&&DH(OX+deckWpx,OX+deckWpx+stRunPx,PAD_BOT+18,
                 `${stairRun}mm`,false),
 
-              // Footer note
               React.createElement("text",{x:OX,y:CVS_H-8,fontSize:8,fill:"#ccc"},
                 "Member sizes per AS1684. Verify against span tables for wind region and loading.")
             )

@@ -296,7 +296,7 @@ function App(){
   const validate=(s)=>{
     const e={};
     if(s===1&&!/^\d{4}$/.test(form.postcode||""))e.postcode="Just need a valid 4-digit postcode to continue.";
-    if(s===3&&!form.siteCondition)e.siteCondition="Just let me know if the site is flat or needs some work first.";
+    if(s===4&&!form.siteCondition)e.siteCondition="Just let me know if the site is flat or needs some work first.";
     setErrors(e);return Object.keys(e).length===0;
   };
   const go=(s)=>{if(!validate(s))return;setScreen(x=>x+1);};

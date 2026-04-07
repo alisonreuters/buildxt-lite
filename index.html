@@ -367,88 +367,11 @@ function App(){
           form.postcode&&form.postcode.length===4&&React.createElement("div",{style:{marginTop:10,padding:"8px 12px",background:"#F0FDF4",borderRadius:8,fontSize:12,color:"#166534",display:"flex",gap:6,alignItems:"center"}},
             "✓ ",React.createElement("span",null,React.createElement("b",null,wind.region," · ",wind.terrain)," — ",wind.desc))
         )),
-        React.createElement(PBtn,{label:"Let's go →",onClick:()=>go(1)})
-      ),
-
-      // ── SCREEN 2: Deck position picker ──────────────────────────
-      screen===2&&React.createElement("div",{className:"fade"},
-        jeff("Where does the deck sit?","Tap to place it relative to the house."),
-        card(React.createElement("div",{style:{display:"flex",flexDirection:"column",alignItems:"center",gap:8}},
-          React.createElement("div",{style:{position:"relative",width:240,height:240}},
-
-            // Compass labels
-            ...[["N",120,12],["S",120,232],["W",12,120],["E",228,120]].map(([l,x,y])=>
-              React.createElement("text",{key:l,style:{position:"absolute",left:x,top:y,
-                fontSize:10,color:"#bbb",fontWeight:500,transform:"translate(-50%,-50%)",
-                pointerEvents:"none"}},l)
-            ),
-
-            // House
-            React.createElement("div",{style:{
-              position:"absolute",top:"50%",left:"50%",
-              transform:"translate(-50%,-50%)",
-              width:90,height:80,background:"#E8E4DC",
-              border:"2px solid #A09880",borderRadius:4,
-              display:"flex",alignItems:"center",justifyContent:"center",
-              flexDirection:"column",gap:4}},
-              React.createElement("div",{style:{fontSize:20}},"🏠"),
-              React.createElement("div",{style:{fontSize:10,color:"#888",fontWeight:500}})
-            ),
-
-            // Deck zones — tap to place
-            ...[
-              ["top",   "50%","4px",   "translateX(-50%)", 90,52, "North wall"],
-              ["bottom","50%","184px", "translateX(-50%)", 90,52, "South wall"],
-              ["left",  "4px","50%",   "translateY(-50%)", 52,80, "West wall"],
-              ["right", "184px","50%", "translateY(-50%)", 52,80, "East wall"],
-            ].map(([pos,left,top,transform,w,h,label])=>{
-              const sel=form.houseWall===pos;
-              return React.createElement("div",{key:pos,
-                onClick:()=>{
-                  upd("houseWall",pos);
-                  // Set sensible stair default — opposite face to house
-                  const opp={top:"S",bottom:"N",left:"E",right:"W"};
-                  upd("layoutStairs",opp[pos]);
-                  // Suggest board direction
-                  upd("layoutBoard",pos==="left"||pos==="right"?"NS":"EW");
-                },
-                style:{
-                  position:"absolute",left,top,transform,
-                  width:w,height:h,
-                  border:`2px ${sel?"solid":"dashed"} ${sel?"#F2B705":"#ddd"}`,
-                  borderRadius:6,
-                  background:sel?"#F2B705":"#F7F7F7",
-                  display:"flex",alignItems:"center",justifyContent:"center",
-                  fontSize:11,fontWeight:sel?700:400,
-                  color:sel?"#1A1A1A":"#aaa",
-                  cursor:"pointer"}},
-                "Deck")
-            })
-          ),
-
-          // Result
-          form.houseWall&&React.createElement("div",{style:{
-            background:"#F0FDF4",borderRadius:10,padding:"10px 14px",
-            fontSize:13,color:"#166534",lineHeight:1.6,width:"100%"}},
-            React.createElement("b",null,{top:"North",bottom:"South",left:"West",right:"East"}[form.houseWall]," face of house"),
-            React.createElement("br",null),
-            React.createElement("span",{style:{fontSize:12,color:"#4B7B58"}},
-              "Stairs can face: ",
-              {
-                top:"east · west · south (away from house)",
-                bottom:"east · west · north (away from house)",
-                left:"north · south · east (away from house)",
-                right:"north · south · west (away from house)",
-              }[form.houseWall]
-            )
-          )
-        )),
-        form.houseWall&&React.createElement(PBtn,{label:"Continue →",onClick:()=>go(2)}),
-        React.createElement(BackBtn,null)
+        React.createElement(PBtn,{label:"Let's go →",onClick:()=>go(2)})
       ),
 
       // ── SCREEN 2: What are you building ────────────────────────
-      screen===3&&React.createElement("div",{className:"fade"},
+      screen===2&&React.createElement("div",{className:"fade"},
         jeff("What are you building?","Select a project type, describe what you have in mind, and tell me the size."),
         card(React.createElement("div",null,
           React.createElement("div",{style:{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:7,marginBottom:14}},
@@ -478,7 +401,7 @@ function App(){
         React.createElement(BackBtn,null)
       ),
 
-      // ── SCREEN 3: Site + Spec ───────────────────────────────────
+      // ── SCREEN 4: Site + Spec ───────────────────────────────────
       screen===4&&React.createElement("div",{className:"fade"},
         jeff("Tell me about the site and what you'd like"),
         card(React.createElement("div",null,
@@ -500,7 +423,7 @@ function App(){
                 React.createElement("div",{style:{fontSize:11,color:"#888",marginTop:2}},s))
             )
           ),
-          screen===4&&form.deckLevel==="ground"&&form.stairType==="none"&&React.createElement("div",{style:{background:"#FFF9E6",borderRadius:8,padding:"8px 10px",marginTop:8,marginBottom:4,fontSize:12,color:"#665500",display:"flex",gap:6,lineHeight:1.5}},
+          screen===5&&form.deckLevel==="ground"&&form.stairType==="none"&&React.createElement("div",{style:{background:"#FFF9E6",borderRadius:8,padding:"8px 10px",marginTop:8,marginBottom:4,fontSize:12,color:"#665500",display:"flex",gap:6,lineHeight:1.5}},
             React.createElement("span",{style:{flexShrink:0}},"ⓘ"),
             "Your deck sits 270mm above flat ground — I've allowed for one step in the estimate."
           ),
@@ -513,16 +436,16 @@ function App(){
             ),
             React.createElement("div",{style:{fontSize:11,color:"#888",marginTop:8,textAlign:"center"}},
               `${est.rules.nSteps} risers @ ${est.rules.riser}mm each · ${est.rules.high?"⚠ Upgraded specs required (>1800mm)":"Standard specs apply"}`),
-            screen===4&&Number(form.heightMm)>=1000&&form.balustradeType==="none"&&React.createElement("div",{style:{background:"#FEF2F2",borderRadius:8,padding:"8px 10px",marginTop:8,fontSize:12,color:"#991B1B",display:"flex",gap:6,lineHeight:1.5}},
+            screen===5&&Number(form.heightMm)>=1000&&form.balustradeType==="none"&&React.createElement("div",{style:{background:"#FEF2F2",borderRadius:8,padding:"8px 10px",marginTop:8,fontSize:12,color:"#991B1B",display:"flex",gap:6,lineHeight:1.5}},
               React.createElement("span",{style:{flexShrink:0}},"⚠"),
               "At this height a balustrade is required by the NCC. It is not included in your estimate — owner to supply and install to comply."
             ),
 
-            screen===4&&Number(form.heightMm)>=270&&Number(form.heightMm)<730&&form.stairType==="none"&&React.createElement("div",{style:{background:"#FFF9E6",borderRadius:8,padding:"8px 10px",marginTop:8,fontSize:12,color:"#665500",display:"flex",gap:6,lineHeight:1.5}},
+            screen===5&&Number(form.heightMm)>=270&&Number(form.heightMm)<730&&form.stairType==="none"&&React.createElement("div",{style:{background:"#FFF9E6",borderRadius:8,padding:"8px 10px",marginTop:8,fontSize:12,color:"#665500",display:"flex",gap:6,lineHeight:1.5}},
               React.createElement("span",{style:{flexShrink:0}},"ⓘ"),
               "I've allowed for stairs for this height."
             ),
-            screen===4&&Number(form.heightMm)>=270&&Number(form.heightMm)<730&&form.stairType!=="none"&&React.createElement("div",{style:{background:"#F0FDF4",borderRadius:8,padding:"8px 10px",marginTop:8,fontSize:12,color:"#166534",display:"flex",gap:6,lineHeight:1.5}},
+            screen===5&&Number(form.heightMm)>=270&&Number(form.heightMm)<730&&form.stairType!=="none"&&React.createElement("div",{style:{background:"#F0FDF4",borderRadius:8,padding:"8px 10px",marginTop:8,fontSize:12,color:"#166534",display:"flex",gap:6,lineHeight:1.5}},
               React.createElement("span",{style:{flexShrink:0}},"✓"),
               "I've allowed for stairs in this design."
             )
@@ -588,11 +511,11 @@ function App(){
               `${est.rules.nSteps} risers @ ${est.rules.riser}mm · 300mm going · stair run ${est.rules.nSteps*300}mm · max width ${Math.round(parseFloat(form.length)*1000)}mm`)
           )
         )),
-        screen===4&&React.createElement(PBtn,{label:"See my layout →",onClick:()=>go(4)}),
-        screen===4&&React.createElement(BackBtn,null)
+        screen===5&&React.createElement(PBtn,{label:"See my layout →",onClick:()=>go(5)}),
+        screen===5&&React.createElement(BackBtn,null)
       ),
 
-      // ── SCREEN 4: Layout plan ───────────────────────────────────
+      // ── SCREEN 5: Layout plan ───────────────────────────────────
       screen===5&&React.createElement("div",{className:"fade"},
         jeff(`Your ${form.length}m × ${form.width}m ${form.projectType}`,"Adjust the layout — board direction, stairs and features."),
         card((()=>{
@@ -762,7 +685,7 @@ function App(){
             )
           );
         })()),
-        screen===5&&React.createElement("div",{style:{background:"white",borderRadius:12,border:`1px solid ${BD}`,padding:12,marginBottom:12,fontSize:12,color:"#666",lineHeight:1.6,borderLeft:`3px solid ${Y}`}},
+        screen===6&&React.createElement("div",{style:{background:"white",borderRadius:12,border:`1px solid ${BD}`,padding:12,marginBottom:12,fontSize:12,color:"#666",lineHeight:1.6,borderLeft:`3px solid ${Y}`}},
           React.createElement("b",{style:{color:TX}},"Jeff's read: "),
           (()=>{
             const hmm=Number(form.heightMm)||0;
@@ -784,11 +707,11 @@ function App(){
             return parts.join(" · ");
           })()
         ),
-        screen===5&&React.createElement(PBtn,{label:"See drawings →",onClick:()=>go(5)}),
-        screen===5&&React.createElement(BackBtn,null)
+        screen===6&&React.createElement(PBtn,{label:"See drawings →",onClick:()=>go(6)}),
+        screen===6&&React.createElement(BackBtn,null)
       ),
 
-      // ── SCREEN 5: Technical drawings ─────────────────────────────
+      // ── SCREEN 6: Technical drawings ─────────────────────────────
       screen===6&&React.createElement("div",{className:"fade"},
         jeff("Your set-out drawings","Calculated from your inputs — plan view and section elevation."),
         card((()=>{
@@ -1052,11 +975,11 @@ function App(){
             )
           );
         })()),
-        screen===6&&React.createElement(PBtn,{label:"See 3D set out →",onClick:()=>go(6)}),
-        screen===6&&React.createElement(BackBtn,null)
+        screen===7&&React.createElement(PBtn,{label:"See 3D set out →",onClick:()=>go(7)}),
+        screen===7&&React.createElement(BackBtn,null)
       ),
 
-      // ── SCREEN 6: 3D Set out ────────────────────────────────────
+      // ── SCREEN 7: 3D Set out ────────────────────────────────────
       screen===7&&React.createElement("div",{className:"fade"},
         jeff("Your 3D set out"),
         React.createElement("div",{style:{borderRadius:14,overflow:"hidden",marginBottom:12,background:"#111",position:"relative"}},
@@ -1078,11 +1001,11 @@ function App(){
           React.createElement("b",{style:{color:TX}},"Structure: "),
           `${est.rules.nFootings} footings · ${est.rules.nBearerRows} bearer rows × ${est.rules.nPostsPerBearer} posts · ${est.rules.joistLabel} joists`
         ),
-        screen===7&&React.createElement(PBtn,{label:"See my estimate →",onClick:()=>go(7)}),
-        screen===7&&React.createElement(BackBtn,null)
+        screen===8&&React.createElement(PBtn,{label:"See my estimate →",onClick:()=>go(8)}),
+        screen===8&&React.createElement(BackBtn,null)
       ),
 
-      // ── SCREEN 7: Estimate + Save ───────────────────────────────
+      // ── SCREEN 8: Estimate + Save ───────────────────────────────
       screen===8&&React.createElement("div",{className:"fade"},
         jeff("Your estimate"),
         card(React.createElement("div",{style:{textAlign:"center"}},
@@ -1162,4 +1085,46 @@ function App(){
 ReactDOM.render(React.createElement(App),document.getElementById("root"));
 </script>
 </body>
-</html>
+</html>      // ── SCREEN 3: Deck position ───────────────────────────────────
+      screen===3&&form.projectType==="Deck"&&React.createElement("div",{className:"fade"},
+        jeff("Where does your deck sit?","Tap to place it relative to the house."),
+        card(React.createElement("div",{style:{display:"flex",flexDirection:"column",alignItems:"center",gap:12}},
+          React.createElement("div",{style:{position:"relative",width:240,height:240,margin:"0 auto"}},
+            React.createElement("div",{style:{position:"absolute",top:2,left:"50%",transform:"translateX(-50%)",fontSize:11,fontWeight:600,color:"#aaa"}},"N"),
+            React.createElement("div",{style:{position:"absolute",bottom:2,left:"50%",transform:"translateX(-50%)",fontSize:11,fontWeight:600,color:"#aaa"}},"S"),
+            React.createElement("div",{style:{position:"absolute",left:2,top:"50%",transform:"translateY(-50%)",fontSize:11,fontWeight:600,color:"#aaa"}},"W"),
+            React.createElement("div",{style:{position:"absolute",right:2,top:"50%",transform:"translateY(-50%)",fontSize:11,fontWeight:600,color:"#aaa"}},"E"),
+            React.createElement("div",{style:{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",width:86,height:76,background:"#E8E4DC",border:"2px solid #A09880",borderRadius:4,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:2,pointerEvents:"none"}},
+              React.createElement("div",{style:{fontSize:18}},"🏠"),
+              React.createElement("div",{style:{fontSize:9,color:"#999",fontWeight:500}},"House")
+            ),
+            ...[
+              {pos:"top",   st:{top:16,left:"50%",transform:"translateX(-50%)",width:88,height:46}},
+              {pos:"bottom",st:{bottom:16,left:"50%",transform:"translateX(-50%)",width:88,height:46}},
+              {pos:"left",  st:{left:16,top:"50%",transform:"translateY(-50%)",width:46,height:76}},
+              {pos:"right", st:{right:16,top:"50%",transform:"translateY(-50%)",width:46,height:76}},
+            ].map(({pos,st})=>{
+              const sel=form.houseWall===pos;
+              const opp={top:"S",bottom:"N",left:"E",right:"W"};
+              return React.createElement("div",{key:pos,
+                onClick:()=>{upd("houseWall",pos);upd("layoutStairs",opp[pos]);upd("layoutBoard",pos==="left"||pos==="right"?"NS":"EW");},
+                style:{position:"absolute",...st,border:`2px ${sel?"solid":"dashed"} ${sel?"#F2B705":"#ccc"}`,borderRadius:6,background:sel?"#F2B705":"#F9F9F9",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:sel?700:400,color:sel?"#1A1A1A":"#bbb",cursor:"pointer",userSelect:"none"}},
+                "Deck")
+            })
+          ),
+          form.houseWall&&React.createElement("div",{style:{background:"#F0FDF4",borderRadius:10,padding:"10px 14px",fontSize:13,color:"#166534",lineHeight:1.6,width:"100%"}},
+            React.createElement("b",null,{top:"North",bottom:"South",left:"West",right:"East"}[form.houseWall]," wall of house"),
+            React.createElement("br",null),
+            React.createElement("span",{style:{fontSize:12,color:"#4B7B58"}},"Stairs default to: ",{top:"south face",bottom:"north face",left:"east face",right:"west face"}[form.houseWall]," (away from house)")
+          )
+        )),
+        form.houseWall&&React.createElement(PBtn,{label:"Continue →",onClick:()=>go(4)}),
+        React.createElement(BackBtn,null)
+      ),
+      screen===3&&form.projectType!=="Deck"&&React.createElement("div",{className:"fade"},
+        jeff(`Got it — let's do a ${form.projectType}.`,"More assembly types are on the way. Start with a deck to try Jeff."),
+        React.createElement(PBtn,{label:"Switch to deck",onClick:()=>upd("projectType","Deck")}),
+        React.createElement(BackBtn,null)
+      ),
+
+

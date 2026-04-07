@@ -180,6 +180,8 @@ function calcEstimate(f){
 
   const stairW=Math.min(Number(f.stairWidthMm)||1200,L*1000);
   const stairCost=f.stairType==="none"?0:P.stairs_base+Math.max(0,(stairW-1200)/100)*P.stairs_per100mm;
+  // Stringer count: 1 each end + 1 every 1000mm if wider than 1000mm
+  const nStringers=2+Math.max(0,Math.floor((stairW-1000)/1000));
   const balPerim=hasBal?Math.ceil(perimLm*0.6):0;
 
   // Bearer line items — split perimeter (double if balustrade) and internal
@@ -203,7 +205,7 @@ function calcEstimate(f){
     {cat:"Decking",label:`${board.label} ${board.w}×19 decking`,qty:deckingLm,unit:"LM",rate:board.price,note:`${area.toFixed(1)}m² · ${(1/boardCentres).toFixed(1)} boards/m`},
     {cat:"Decking",label:fixing.label,qty:fixingQty,unit:fixing.unit,rate:fixing.rate},
     oilCans>0?{cat:"Decking",label:"Decking oil 4L",qty:oilCans,unit:"EA",rate:P.deck_oil}:null,
-    f.stairType!=="none"?{cat:"Features",label:`Stairs — ${stairW}mm wide · ${rules.nSteps} risers @ ${rules.riser}mm`,qty:1,unit:"ITEM",rate:stairCost}:null,
+    f.stairType!=="none"?{cat:"Features",label:`Stairs — ${stairW}mm wide · ${rules.nSteps} risers @ ${rules.riser}mm · ${nStringers} stringers`,qty:1,unit:"ITEM",rate:stairCost}:null,
     balPerim>0?{cat:"Features",label:"Balustrade allowance",qty:balPerim,unit:"LM",rate:P.balustrade_lm,note:"~60% perimeter"}:null,
     {cat:"Sundries",label:"Sundries & consumables",qty:1,unit:"ITEM",rate:P.sundries_base+area*P.sundries_m2},
   ].filter(Boolean);
@@ -311,7 +313,7 @@ function App(){
   const BackBtn=()=>screen>1?React.createElement("button",{onClick:back,style:{background:"none",border:"none",fontSize:14,fontWeight:600,textDecoration:"underline",padding:"4px 0",display:"block",color:TX}},"← Back"):null;
   const Err=(k)=>errors[k]?React.createElement("div",{style:{fontSize:12,color:"#e53e3e",marginBottom:6,marginTop:2}},errors[k]):null;
   const dots=()=>React.createElement("div",{style:{display:"flex",justifyContent:"center",gap:6,padding:"6px 0 10px"}},
-    Array.from({length:7},(_,i)=>React.createElement("div",{key:i,style:{width:i+1===screen?20:8,height:8,borderRadius:4,background:i+1===screen?Y:BD,transition:"all 0.3s"}})));
+    Array.from({length:8},(_,i)=>React.createElement("div",{key:i,style:{width:i+1===screen?20:8,height:8,borderRadius:4,background:i+1===screen?Y:BD,transition:"all 0.3s"}})));
   const T=(active,onClick,label)=>React.createElement("button",{onClick,style:{padding:"6px 13px",borderRadius:20,border:`1.5px solid ${active?Y:BD}`,background:active?"#FFF9E6":"white",fontSize:12,fontWeight:active?700:400,marginBottom:4}},label);
   const jeff=(t,sub)=>React.createElement("div",{style:{marginBottom:14},className:"fade"},
     React.createElement("div",{style:{fontSize:20,fontWeight:600,lineHeight:1.35,color:TX}},t),
@@ -368,8 +370,85 @@ function App(){
         React.createElement(PBtn,{label:"Let's go →",onClick:()=>go(1)})
       ),
 
-      // ── SCREEN 2: What are you building ────────────────────────
+      // ── SCREEN 2: Deck position picker ──────────────────────────
       screen===2&&React.createElement("div",{className:"fade"},
+        jeff("Where does the deck sit?","Tap to place it relative to the house."),
+        card(React.createElement("div",{style:{display:"flex",flexDirection:"column",alignItems:"center",gap:8}},
+          React.createElement("div",{style:{position:"relative",width:240,height:240}},
+
+            // Compass labels
+            ...[["N",120,12],["S",120,232],["W",12,120],["E",228,120]].map(([l,x,y])=>
+              React.createElement("text",{key:l,style:{position:"absolute",left:x,top:y,
+                fontSize:10,color:"#bbb",fontWeight:500,transform:"translate(-50%,-50%)",
+                pointerEvents:"none"}},l)
+            ),
+
+            // House
+            React.createElement("div",{style:{
+              position:"absolute",top:"50%",left:"50%",
+              transform:"translate(-50%,-50%)",
+              width:90,height:80,background:"#E8E4DC",
+              border:"2px solid #A09880",borderRadius:4,
+              display:"flex",alignItems:"center",justifyContent:"center",
+              flexDirection:"column",gap:4}},
+              React.createElement("div",{style:{fontSize:20}},"🏠"),
+              React.createElement("div",{style:{fontSize:10,color:"#888",fontWeight:500}})
+            ),
+
+            // Deck zones — tap to place
+            ...[
+              ["top",   "50%","4px",   "translateX(-50%)", 90,52, "North wall"],
+              ["bottom","50%","184px", "translateX(-50%)", 90,52, "South wall"],
+              ["left",  "4px","50%",   "translateY(-50%)", 52,80, "West wall"],
+              ["right", "184px","50%", "translateY(-50%)", 52,80, "East wall"],
+            ].map(([pos,left,top,transform,w,h,label])=>{
+              const sel=form.houseWall===pos;
+              return React.createElement("div",{key:pos,
+                onClick:()=>{
+                  upd("houseWall",pos);
+                  // Set sensible stair default — opposite face to house
+                  const opp={top:"S",bottom:"N",left:"E",right:"W"};
+                  upd("layoutStairs",opp[pos]);
+                  // Suggest board direction
+                  upd("layoutBoard",pos==="left"||pos==="right"?"NS":"EW");
+                },
+                style:{
+                  position:"absolute",left,top,transform,
+                  width:w,height:h,
+                  border:`2px ${sel?"solid":"dashed"} ${sel?"#F2B705":"#ddd"}`,
+                  borderRadius:6,
+                  background:sel?"#F2B705":"#F7F7F7",
+                  display:"flex",alignItems:"center",justifyContent:"center",
+                  fontSize:11,fontWeight:sel?700:400,
+                  color:sel?"#1A1A1A":"#aaa",
+                  cursor:"pointer"}},
+                "Deck")
+            })
+          ),
+
+          // Result
+          form.houseWall&&React.createElement("div",{style:{
+            background:"#F0FDF4",borderRadius:10,padding:"10px 14px",
+            fontSize:13,color:"#166534",lineHeight:1.6,width:"100%"}},
+            React.createElement("b",null,{top:"North",bottom:"South",left:"West",right:"East"}[form.houseWall]," face of house"),
+            React.createElement("br",null),
+            React.createElement("span",{style:{fontSize:12,color:"#4B7B58"}},
+              "Stairs can face: ",
+              {
+                top:"east · west · south (away from house)",
+                bottom:"east · west · north (away from house)",
+                left:"north · south · east (away from house)",
+                right:"north · south · west (away from house)",
+              }[form.houseWall]
+            )
+          )
+        )),
+        form.houseWall&&React.createElement(PBtn,{label:"Continue →",onClick:()=>go(2)}),
+        React.createElement(BackBtn,null)
+      ),
+
+      // ── SCREEN 2: What are you building ────────────────────────
+      screen===3&&React.createElement("div",{className:"fade"},
         jeff("What are you building?","Select a project type, describe what you have in mind, and tell me the size."),
         card(React.createElement("div",null,
           React.createElement("div",{style:{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:7,marginBottom:14}},
@@ -395,12 +474,12 @@ function App(){
           React.createElement("div",{style:{textAlign:"center",fontSize:13,color:"#777",marginTop:4}},
             "Floor area: ",React.createElement("b",null,est.area.toFixed(1)," m²"))
         )),
-        React.createElement(PBtn,{label:"Continue",onClick:()=>go(2)}),
+        React.createElement(PBtn,{label:"Continue",onClick:()=>go(3)}),
         React.createElement(BackBtn,null)
       ),
 
       // ── SCREEN 3: Site + Spec ───────────────────────────────────
-      screen===3&&React.createElement("div",{className:"fade"},
+      screen===4&&React.createElement("div",{className:"fade"},
         jeff("Tell me about the site and what you'd like"),
         card(React.createElement("div",null,
           React.createElement("div",{style:{fontSize:13,fontWeight:600,marginBottom:8,color:"#555"}},"Site conditions"),
@@ -421,7 +500,7 @@ function App(){
                 React.createElement("div",{style:{fontSize:11,color:"#888",marginTop:2}},s))
             )
           ),
-          screen===3&&form.deckLevel==="ground"&&form.stairType==="none"&&React.createElement("div",{style:{background:"#FFF9E6",borderRadius:8,padding:"8px 10px",marginTop:8,marginBottom:4,fontSize:12,color:"#665500",display:"flex",gap:6,lineHeight:1.5}},
+          screen===4&&form.deckLevel==="ground"&&form.stairType==="none"&&React.createElement("div",{style:{background:"#FFF9E6",borderRadius:8,padding:"8px 10px",marginTop:8,marginBottom:4,fontSize:12,color:"#665500",display:"flex",gap:6,lineHeight:1.5}},
             React.createElement("span",{style:{flexShrink:0}},"ⓘ"),
             "Your deck sits 270mm above flat ground — I've allowed for one step in the estimate."
           ),
@@ -434,16 +513,16 @@ function App(){
             ),
             React.createElement("div",{style:{fontSize:11,color:"#888",marginTop:8,textAlign:"center"}},
               `${est.rules.nSteps} risers @ ${est.rules.riser}mm each · ${est.rules.high?"⚠ Upgraded specs required (>1800mm)":"Standard specs apply"}`),
-            screen===3&&Number(form.heightMm)>=1000&&form.balustradeType==="none"&&React.createElement("div",{style:{background:"#FEF2F2",borderRadius:8,padding:"8px 10px",marginTop:8,fontSize:12,color:"#991B1B",display:"flex",gap:6,lineHeight:1.5}},
+            screen===4&&Number(form.heightMm)>=1000&&form.balustradeType==="none"&&React.createElement("div",{style:{background:"#FEF2F2",borderRadius:8,padding:"8px 10px",marginTop:8,fontSize:12,color:"#991B1B",display:"flex",gap:6,lineHeight:1.5}},
               React.createElement("span",{style:{flexShrink:0}},"⚠"),
               "At this height a balustrade is required by the NCC. It is not included in your estimate — owner to supply and install to comply."
             ),
 
-            screen===3&&Number(form.heightMm)>=270&&Number(form.heightMm)<730&&form.stairType==="none"&&React.createElement("div",{style:{background:"#FFF9E6",borderRadius:8,padding:"8px 10px",marginTop:8,fontSize:12,color:"#665500",display:"flex",gap:6,lineHeight:1.5}},
+            screen===4&&Number(form.heightMm)>=270&&Number(form.heightMm)<730&&form.stairType==="none"&&React.createElement("div",{style:{background:"#FFF9E6",borderRadius:8,padding:"8px 10px",marginTop:8,fontSize:12,color:"#665500",display:"flex",gap:6,lineHeight:1.5}},
               React.createElement("span",{style:{flexShrink:0}},"ⓘ"),
               "I've allowed for stairs for this height."
             ),
-            screen===3&&Number(form.heightMm)>=270&&Number(form.heightMm)<730&&form.stairType!=="none"&&React.createElement("div",{style:{background:"#F0FDF4",borderRadius:8,padding:"8px 10px",marginTop:8,fontSize:12,color:"#166534",display:"flex",gap:6,lineHeight:1.5}},
+            screen===4&&Number(form.heightMm)>=270&&Number(form.heightMm)<730&&form.stairType!=="none"&&React.createElement("div",{style:{background:"#F0FDF4",borderRadius:8,padding:"8px 10px",marginTop:8,fontSize:12,color:"#166534",display:"flex",gap:6,lineHeight:1.5}},
               React.createElement("span",{style:{flexShrink:0}},"✓"),
               "I've allowed for stairs in this design."
             )
@@ -509,12 +588,12 @@ function App(){
               `${est.rules.nSteps} risers @ ${est.rules.riser}mm · 300mm going · stair run ${est.rules.nSteps*300}mm · max width ${Math.round(parseFloat(form.length)*1000)}mm`)
           )
         )),
-        screen===3&&React.createElement(PBtn,{label:"See my layout →",onClick:()=>go(3)}),
-        screen===3&&React.createElement(BackBtn,null)
+        screen===4&&React.createElement(PBtn,{label:"See my layout →",onClick:()=>go(4)}),
+        screen===4&&React.createElement(BackBtn,null)
       ),
 
       // ── SCREEN 4: Layout plan ───────────────────────────────────
-      screen===4&&React.createElement("div",{className:"fade"},
+      screen===5&&React.createElement("div",{className:"fade"},
         jeff(`Your ${form.length}m × ${form.width}m ${form.projectType}`,"Adjust the layout — board direction, stairs and features."),
         card((()=>{
           const L=parseFloat(form.length)||5;
@@ -683,7 +762,7 @@ function App(){
             )
           );
         })()),
-        screen===4&&React.createElement("div",{style:{background:"white",borderRadius:12,border:`1px solid ${BD}`,padding:12,marginBottom:12,fontSize:12,color:"#666",lineHeight:1.6,borderLeft:`3px solid ${Y}`}},
+        screen===5&&React.createElement("div",{style:{background:"white",borderRadius:12,border:`1px solid ${BD}`,padding:12,marginBottom:12,fontSize:12,color:"#666",lineHeight:1.6,borderLeft:`3px solid ${Y}`}},
           React.createElement("b",{style:{color:TX}},"Jeff's read: "),
           (()=>{
             const hmm=Number(form.heightMm)||0;
@@ -705,12 +784,12 @@ function App(){
             return parts.join(" · ");
           })()
         ),
-        screen===4&&React.createElement(PBtn,{label:"See drawings →",onClick:()=>go(4)}),
-        screen===4&&React.createElement(BackBtn,null)
+        screen===5&&React.createElement(PBtn,{label:"See drawings →",onClick:()=>go(5)}),
+        screen===5&&React.createElement(BackBtn,null)
       ),
 
       // ── SCREEN 5: Technical drawings ─────────────────────────────
-      screen===5&&React.createElement("div",{className:"fade"},
+      screen===6&&React.createElement("div",{className:"fade"},
         jeff("Your set-out drawings","Calculated from your inputs — plan view and section elevation."),
         card((()=>{
           const Lm=parseFloat(form.length)||5;
@@ -923,13 +1002,15 @@ function App(){
                     // Stringer solid body
                     React.createElement("polygon",{points:poly,
                       fill:"#C8A050",stroke:"#806820",strokeWidth:1}),
-                    // Treads on horizontal notch surfaces
-                    ...[...Array(nRisers)].map((_,i)=>
-                      React.createElement("rect",{key:`tr${i}`,
-                        x:x0+i*gW, y:y0+i*rH,
-                        width:gW, height:Math.max(5,MIN_DKH*1.5),
-                        fill:"#C8A050",stroke:"#806820",strokeWidth:0.9})
-                    ),
+                    // Treads — 300mm decking board with ~40mm nosing overhang
+                    // Tread sits on 260mm notch, overhangs 40mm at front
+                    ...[...Array(nRisers)].map((_,i)=>{
+                      const nosing=40*HS; // nosing overhang in px
+                      return React.createElement("rect",{key:`tr${i}`,
+                        x:x0+i*gW-nosing, y:y0+i*rH,
+                        width:gW+nosing, height:Math.max(5,MIN_DKH*1.5),
+                        fill:"#C8A050",stroke:"#806820",strokeWidth:0.9});
+                    }),
                     // Small footing pad at base of stringer
                     React.createElement("rect",{x:x0+stW-22,y:GY,
                       width:44,height:Math.max(6,20*HS),
@@ -971,12 +1052,12 @@ function App(){
             )
           );
         })()),
-        screen===5&&React.createElement(PBtn,{label:"See 3D set out →",onClick:()=>go(5)}),
-        screen===5&&React.createElement(BackBtn,null)
+        screen===6&&React.createElement(PBtn,{label:"See 3D set out →",onClick:()=>go(6)}),
+        screen===6&&React.createElement(BackBtn,null)
       ),
 
       // ── SCREEN 6: 3D Set out ────────────────────────────────────
-      screen===6&&React.createElement("div",{className:"fade"},
+      screen===7&&React.createElement("div",{className:"fade"},
         jeff("Your 3D set out"),
         React.createElement("div",{style:{borderRadius:14,overflow:"hidden",marginBottom:12,background:"#111",position:"relative"}},
           React.createElement("img",{src:render.src,alt:"3D set out of your deck",
@@ -997,12 +1078,12 @@ function App(){
           React.createElement("b",{style:{color:TX}},"Structure: "),
           `${est.rules.nFootings} footings · ${est.rules.nBearerRows} bearer rows × ${est.rules.nPostsPerBearer} posts · ${est.rules.joistLabel} joists`
         ),
-        screen===6&&React.createElement(PBtn,{label:"See my estimate →",onClick:()=>go(6)}),
-        screen===6&&React.createElement(BackBtn,null)
+        screen===7&&React.createElement(PBtn,{label:"See my estimate →",onClick:()=>go(7)}),
+        screen===7&&React.createElement(BackBtn,null)
       ),
 
       // ── SCREEN 7: Estimate + Save ───────────────────────────────
-      screen===7&&React.createElement("div",{className:"fade"},
+      screen===8&&React.createElement("div",{className:"fade"},
         jeff("Your estimate"),
         card(React.createElement("div",{style:{textAlign:"center"}},
           React.createElement("div",{style:{fontSize:12,color:"#aaa",marginBottom:4}},"Budget estimate — materials + labour"),
@@ -1072,7 +1153,7 @@ function App(){
         ),
 
         React.createElement("button",{onClick:()=>setScreen(1),style:{background:"none",border:"none",fontSize:13,color:"#bbb",textDecoration:"underline",display:"block",margin:"8px auto 0"}},"Start a new project"),
-        screen===7&&React.createElement(BackBtn,null)
+        screen===8&&React.createElement(BackBtn,null)
       )
     )
   );

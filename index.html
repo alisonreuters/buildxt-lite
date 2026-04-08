@@ -560,510 +560,467 @@ function App(){
 
       // ── SCREEN 5: Layout plan ───────────────────────────────────
       screen===5&&React.createElement("div",{className:"fade"},
-        jeff(`Your ${form.length}m × ${form.width}m ${form.projectType}`,"Adjust the layout — board direction, stairs and features."),
+        jeff("Your layout plan","Footing grid and board layout — calculated from your inputs."),
         card((()=>{
-          const L=parseFloat(form.length)||5;
-          const D=parseFloat(form.width)||4;
-          const board=BOARDS[form.deckingType||"merbau"];
-          // Scale deck to fit in a fixed 300×220 canvas proportionally
-          const maxW=260,maxH=180;
-          const scaleToFit=Math.min(maxW/L,maxH/D);
-          const dW=Math.round(L*scaleToFit);
-          const dH=Math.round(D*scaleToFit);
-          const ox=Math.round((300-dW)/2);
-          const oy=Math.round((220-dH)/2);
-          // Board lines
-          const centresMm=board.w+board.gap;
-          const isEW=form.layoutBoard==="EW";
-          const centresPx=centresMm/1000*scaleToFit;
+          const Lm=parseFloat(form.length)||5;
+          const Dm=parseFloat(form.width)||4;
+          const FFL=Number(form.heightMm)||300;
+          const boardDir=form.layoutBoard||"EW";
+          const houseWall=form.houseWall||"bottom";
+          const hasStairs=form.stairType!=="none";
+          const stairFace=form.layoutStairs||"S";
+          const stairWidthMm=Number(form.stairWidthMm)||1200;
+          const nRisers=Math.max(2,Math.ceil(FFL/180));
+          const stairRun=nRisers*300;
+          const hasBal=form.balustradeType&&form.balustradeType!=="none";
 
-          // Board lines (surface boards)
-          // EW boards = horizontal lines; NS boards = vertical lines
-          const boardLines=[];
-          if(isEW){
-            for(let y=oy+centresPx;y<oy+dH;y+=centresPx)
-              boardLines.push(React.createElement("line",{key:`bl${y}`,x1:ox,y1:y,x2:ox+dW,y2:y,stroke:"#C8BC9A",strokeWidth:Math.max(1.5,centresPx*0.55),clipPath:"url(#dc4)"}));
-          } else {
-            for(let x=ox+centresPx;x<ox+dW;x+=centresPx)
-              boardLines.push(React.createElement("line",{key:`bl${x}`,x1:x,y1:oy,x2:x,y2:oy+dH,stroke:"#C8BC9A",strokeWidth:Math.max(1.5,centresPx*0.55),clipPath:"url(#dc4)"}));
-          }
+          // 1:20 scale for plan view (wider deck fits better)
+          const SC=1/20;
+          const deckWpx=Lm*1000*SC;
+          const deckDpx=Dm*1000*SC;
+          const stRunPx=stairRun*SC;
+          const stWpx=stairWidthMm*SC;
 
-          // Bearer lines — run SAME direction as boards, spaced perpendicular
-          // EW boards: bearers are EW (horizontal), spaced along D
-          // NS boards: bearers are NS (vertical), spaced along L
-          const maxBSpacing=Number(form.heightMm)>1800?1.5:1.8;
-          const bearerSpanDim=isEW?D:L;
-          const nBRows=Math.ceil(bearerSpanDim/1.8)+1;
-          const bearerLines=[];
-          for(let i=0;i<nBRows;i++){
-            const pos=(i/(Math.max(1,nBRows-1)))*bearerSpanDim*scaleToFit;
-            const isEdge=i===0||i===nBRows-1;
-            if(isEW){
-              bearerLines.push(React.createElement("line",{key:`br${i}`,
-                x1:ox,y1:oy+pos,x2:ox+dW,y2:oy+pos,
-                stroke:isEdge?"#2060C0":"#4080D0",
-                strokeWidth:isEdge?2:1.2,
-                strokeDasharray:isEdge?"none":"5,3",
-                clipPath:"url(#dc4)"}));
-            } else {
-              bearerLines.push(React.createElement("line",{key:`br${i}`,
-                x1:ox+pos,y1:oy,x2:ox+pos,y2:oy+dH,
-                stroke:isEdge?"#2060C0":"#4080D0",
-                strokeWidth:isEdge?2:1.2,
-                strokeDasharray:isEdge?"none":"5,3",
-                clipPath:"url(#dc4)"}));
-            }
-          }
+          // Canvas
+          const ML=60,MR=60,MT=50,MB=60;
+          const CVS_W=Math.max(400,deckWpx+ML+MR+80);
+          const CVS_H=Math.max(300,deckDpx+MT+MB+80);
+          const OX=ML,OY=MT;
 
-          // Joist lines — run PERPENDICULAR to boards, spaced at 450mm
-          // EW boards: joists are NS (vertical), spaced along L
-          // NS boards: joists are EW (horizontal), spaced along D
-          const joistSpacingPx=0.45*scaleToFit;
-          const joistRunDim=isEW?L:D;
-          const joistLines=[];
-          for(let j=joistSpacingPx;j<joistRunDim*scaleToFit;j+=joistSpacingPx){
-            if(isEW){
-              joistLines.push(React.createElement("line",{key:`jl${j}`,
-                x1:ox+j,y1:oy,x2:ox+j,y2:oy+dH,
-                stroke:"#A8C890",strokeWidth:0.5,strokeDasharray:"2,4",clipPath:"url(#dc4)"}));
-            } else {
-              joistLines.push(React.createElement("line",{key:`jl${j}`,
-                x1:ox,y1:oy+j,x2:ox+dW,y2:oy+j,
-                stroke:"#A8C890",strokeWidth:0.5,strokeDasharray:"2,4",clipPath:"url(#dc4)"}));
-            }
-          }
+          // Footing grid
+          const nBRows=Math.ceil(Dm*1000/1800)+1;
+          const nBCols=Math.ceil(Lm*1000/1800)+1;
 
-          // Footing dots at bearer/post intersections
-          const postSpanDim=isEW?L:D;
-          const nPosts=Math.ceil(postSpanDim/maxBSpacing)+1;
-          const footingDots=[];
-          for(let bi=0;bi<nBRows;bi++){
-            const bpos=(bi/(Math.max(1,nBRows-1)))*bearerSpanDim*scaleToFit;
-            for(let pi=0;pi<nPosts;pi++){
-              const ppos=(pi/(Math.max(1,nPosts-1)))*postSpanDim*scaleToFit;
-              const fx=isEW?ox+ppos:ox+bpos;
-              const fy=isEW?oy+bpos:oy+ppos;
-              footingDots.push(React.createElement("g",{key:`fd${bi}${pi}`},
-                React.createElement("circle",{cx:fx,cy:fy,r:4,fill:"#666",stroke:"#444",strokeWidth:0.8}),
-                React.createElement("circle",{cx:fx,cy:fy,r:1.5,fill:"white"})
-              ));
-            }
-          }
-          // Stairs
-          let stairEl=null;
-          if(form.stairType!=="none"){
-            const sp=form.layoutStairs||"S";
-            const isNS=sp==="S"||sp==="N";
-            const maxStairMm=isNS?L*1000:D*1000;
-            const actualWmm=form.layoutStairsFull?maxStairMm:Math.min(Number(form.stairWidthMm)||1200,maxStairMm);
-            const stWpx=Math.round(actualWmm/1000*scaleToFit);
-            const stH=16;
-            const positions={
-              S:[ox+(dW-stWpx)/2, oy+dH, stWpx, stH],
-              N:[ox+(dW-stWpx)/2, oy-stH, stWpx, stH],
-              E:[ox+dW, oy+(dH-stWpx)/2, stH, stWpx],
-              W:[ox-stH, oy+(dH-stWpx)/2, stH, stWpx],
-            };
-            const[rx,ry,rw,rh]=positions[sp]||positions.S;
-            stairEl=React.createElement("g",null,
-              React.createElement("rect",{x:Math.round(rx),y:Math.round(ry),width:Math.round(rw),height:Math.round(rh),fill:Y,stroke:"#111",strokeWidth:1.5,rx:2}),
-              (sp==="S"||sp==="N")&&React.createElement("text",{x:Math.round(rx+rw/2),y:Math.round(ry+(sp==="S"?11:-4)),textAnchor:"middle",fontSize:8,fill:"#555"},"stairs")
-            );
-          }
-          // Feature zones
-          const bbqEl=(form.placements||{}).bbq?React.createElement("g",null,
-            React.createElement("rect",{x:ox+dW-Math.min(56,dW*0.25)-4,y:oy+4,width:Math.min(56,dW*0.25),height:Math.min(36,dH*0.3),rx:3,fill:"#FFF0C0",stroke:"#E0A800",strokeWidth:1.5}),
-            React.createElement("text",{x:ox+dW-Math.min(56,dW*0.25)/2-4,y:oy+Math.min(36,dH*0.3)/2+8,textAnchor:"middle",fontSize:9,fill:"#7A5800",fontWeight:"bold"},"BBQ")
-          ):null;
-          const alfEl=(form.placements||{}).alfresco?React.createElement("g",null,
-            React.createElement("rect",{x:ox+4,y:oy+4,width:Math.min(80,dW*0.4),height:Math.min(36,dH*0.3),rx:3,fill:"#E0F4FF",stroke:"#4AABDE",strokeWidth:1.5}),
-            React.createElement("text",{x:ox+4+Math.min(80,dW*0.4)/2,y:oy+Math.min(36,dH*0.3)/2+8,textAnchor:"middle",fontSize:9,fill:"#1A5F7A",fontWeight:"bold"},"Alfresco")
-          ):null;
+          // Bearer rows (across D direction)
+          const bRowYs=Array.from({length:nBRows},(_,i)=>OY+(i/Math.max(1,nBRows-1))*deckDpx);
+          // Post cols (along L direction)
+          const bColXs=Array.from({length:nBCols},(_,i)=>OX+(i/Math.max(1,nBCols-1))*deckWpx);
+
+          // Section A-A cut line — perpendicular to boards
+          // If EW boards → joists NS → cut E-W (horizontal on plan)
+          // If NS boards → joists EW → cut N-S (vertical on plan)
+          const sectionY=OY+deckDpx/2;
+          const sectionX=OX+deckWpx/2;
+
+          // Stair rectangle on plan
+          const stairRects={
+            N:{x:OX+(deckWpx-stWpx)/2,y:OY-stRunPx,w:stWpx,h:stRunPx},
+            S:{x:OX+(deckWpx-stWpx)/2,y:OY+deckDpx,w:stWpx,h:stRunPx},
+            E:{x:OX+deckWpx,y:OY+(deckDpx-stWpx)/2,w:stRunPx,h:stWpx},
+            W:{x:OX-stRunPx,y:OY+(deckDpx-stWpx)/2,w:stRunPx,h:stWpx},
+          };
+          const sr=hasStairs?stairRects[stairFace]||stairRects.S:null;
+
+          const ns="http://www.w3.org/2000/svg";
+          const e=(tag,attrs,txt)=>{
+            const el=document.createElementNS(ns,tag);
+            Object.entries(attrs).forEach(([k,v])=>el.setAttribute(k,String(v)));
+            if(txt!==undefined)el.textContent=txt;
+            return el;
+          };
 
           return React.createElement("div",null,
-            React.createElement("svg",{width:"100%",viewBox:"0 0 300 220",style:{display:"block",background:"#FAFAFA",borderRadius:8,marginBottom:10}},
-              React.createElement("defs",null,React.createElement("clipPath",{id:"dc4"},React.createElement("rect",{x:ox,y:oy,width:dW,height:dH}))),
-              React.createElement("rect",{x:ox,y:oy,width:dW,height:dH,fill:"#F5EFD8",stroke:"none"}),
-              ...joistLines,
-              ...bearerLines,
-              ...boardLines,
-              ...footingDots,
-              React.createElement("rect",{x:ox,y:oy,width:dW,height:dH,fill:"none",stroke:"#111",strokeWidth:2}),
-              React.createElement("text",{x:ox+dW/2,y:oy-6,textAnchor:"middle",fontSize:9,fill:"#bbb"},"N"),
-              React.createElement("text",{x:ox+dW/2,y:oy+dH+14,textAnchor:"middle",fontSize:9,fill:"#bbb"},"S"),
-              React.createElement("text",{x:ox-8,y:oy+dH/2+4,textAnchor:"middle",fontSize:9,fill:"#bbb"},"W"),
-              React.createElement("text",{x:ox+dW+8,y:oy+dH/2+4,textAnchor:"middle",fontSize:9,fill:"#bbb"},"E"),
-              React.createElement("text",{x:ox+dW/2,y:oy+dH+26,textAnchor:"middle",fontSize:9,fill:"#888"},`${form.length}m`),
-              React.createElement("text",{x:ox+dW+20,y:oy+dH/2+4,textAnchor:"middle",fontSize:9,fill:"#888",transform:`rotate(-90,${ox+dW+20},${oy+dH/2})`},`${form.width}m`),
-              stairEl,
-              bbqEl,
-              alfEl
-            ),
-            React.createElement("div",{style:{fontSize:12,color:"#888",textAlign:"center",marginBottom:12}},
-              `${board.w}mm ${board.label} · ${form.length}m × ${form.width}m = ${est.area.toFixed(1)}m²`),
-            React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}},
-              React.createElement("button",{style:{border:`1px solid ${BD}`,borderRadius:10,padding:"10px",background:"white",fontSize:12,textAlign:"left"},
-                onClick:()=>upd("layoutBoard",form.layoutBoard==="EW"?"NS":"EW")},
-                React.createElement("div",{style:{fontSize:10,color:"#aaa",marginBottom:2}},"Board direction"),
-                form.layoutBoard==="EW"?"← E–W →":"↑ N–S ↓"),
-              form.stairType!=="none"&&React.createElement("button",{style:{border:`1px solid ${BD}`,borderRadius:10,padding:"10px",background:"white",fontSize:12,textAlign:"left"},
-                onClick:()=>{const o=["N","E","S","W"];upd("layoutStairs",o[(o.indexOf(form.layoutStairs||"S")+1)%4]);}},
-                React.createElement("div",{style:{fontSize:10,color:"#aaa",marginBottom:2}},"Stairs face"),
-                {"N":"North","S":"South","E":"East","W":"West"}[form.layoutStairs||"S"]+" side"),
-              form.stairType!=="none"&&React.createElement("button",{style:{border:`1px solid ${BD}`,borderRadius:10,padding:"10px",background:form.layoutStairsFull?"#FFF9E6":"white",fontSize:12,textAlign:"left"},
-                onClick:()=>upd("layoutStairsFull",!form.layoutStairsFull)},
-                React.createElement("div",{style:{fontSize:10,color:"#aaa",marginBottom:2}},"Stair width"),
-                form.layoutStairsFull?"Full side":"Custom"),
-              form.stairType==="none"&&React.createElement("div",{style:{border:`1px solid ${BD}`,borderRadius:10,padding:"10px",background:"#F9F9F9",fontSize:12,color:"#bbb",textAlign:"left"}},
-                React.createElement("div",{style:{fontSize:10,color:"#ddd",marginBottom:2}},"Stairs"),
-                "Nil — by owner"),
-              React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:5}},
-                [["bbq","BBQ zone","#FFF0C0","#E0A800"],["alfresco","Alfresco","#E0F4FF","#4AABDE"]].map(([k,l,bg,br])=>
-                  React.createElement("button",{key:k,
-                    style:{border:`1px solid ${(form.placements||{})[k]?br:BD}`,borderRadius:8,padding:"7px 8px",
-                      background:(form.placements||{})[k]?bg:"white",fontSize:11,textAlign:"left",fontWeight:(form.placements||{})[k]?700:400},
-                    onClick:()=>{const cur=(form.placements||{})[k];upd("placements",{...(form.placements||{}),[k]:cur?null:{x:0,y:0}});}},
-                    (form.placements||{})[k]?`Remove ${l}`:`+ ${l}`))
-              )
-            )
+            React.createElement("div",{style:{fontSize:10,fontWeight:600,color:"#888",
+              textTransform:"uppercase",letterSpacing:1,marginBottom:8}},"Plan view"),
+            React.createElement("div",{ref:ref=>{
+              if(!ref||ref._drawn)return; ref._drawn=true;
+              const svg=document.createElementNS(ns,"svg");
+              svg.setAttribute("width","100%");
+              svg.setAttribute("viewBox",`0 0 ${CVS_W} ${CVS_H}`);
+              svg.style.cssText="display:block;background:white;border-radius:10px;border:1px solid #e5e5e5;margin-bottom:8px";
+              const add=el=>svg.appendChild(el);
+
+              // Title
+              const t=e("text",{x:OX,y:MT-28,fontSize:8,fill:"#aaa"},
+                `Plan view · ${Lm}m × ${Dm}m · FFL ${FFL}mm · ${boardDir} boards · Scale 1:20`);
+              add(t);
+
+              // House wall indicator
+              const houseLabels={top:"House (North)",bottom:"House (South)",left:"House (West)",right:"House (East)"};
+              const housePositions={
+                top:{x:OX+deckWpx/2,y:OY-18,anchor:"middle"},
+                bottom:{x:OX+deckWpx/2,y:OY+deckDpx+28,anchor:"middle"},
+                left:{x:OX-24,y:OY+deckDpx/2,anchor:"middle"},
+                right:{x:OX+deckWpx+24,y:OY+deckDpx/2,anchor:"middle"},
+              };
+              const hp=housePositions[houseWall];
+              const ht=e("text",{x:hp.x,y:hp.y,fontSize:8,fill:"#888","text-anchor":hp.anchor},
+                houseLabels[houseWall]||"House");
+              add(ht);
+              // House wall thick line
+              const hwLines={
+                top:[OX,OY,OX+deckWpx,OY],
+                bottom:[OX,OY+deckDpx,OX+deckWpx,OY+deckDpx],
+                left:[OX,OY,OX,OY+deckDpx],
+                right:[OX+deckWpx,OY,OX+deckWpx,OY+deckDpx],
+              };
+              const hl=hwLines[houseWall]||hwLines.bottom;
+              add(e("line",{x1:hl[0],y1:hl[1],x2:hl[2],y2:hl[3],stroke:"#1a1a1a","stroke-width":"3"}));
+
+              // Deck outline
+              add(e("rect",{x:OX,y:OY,width:deckWpx,height:deckDpx,
+                fill:"#FAFAF8",stroke:"#1a1a1a","stroke-width":"1.2"}));
+
+              // Board lines (light)
+              if(boardDir==="EW"||boardDir==="NS"){
+                const isEW=boardDir==="EW";
+                const count=isEW?Math.ceil(Dm*1000/100):Math.ceil(Lm*1000/100);
+                for(let i=1;i<count;i++){
+                  const p=i/count;
+                  const x1=isEW?OX:OX+p*deckWpx;
+                  const y1=isEW?OY+p*deckDpx:OY;
+                  const x2=isEW?OX+deckWpx:OX+p*deckWpx;
+                  const y2=isEW?OY+p*deckDpx:OY+deckDpx;
+                  add(e("line",{x1,y1,x2,y2,stroke:"#ccc","stroke-width":"0.4"}));
+                }
+              }
+
+              // Bearer lines (dashed, perpendicular to boards)
+              bRowYs.forEach(by=>{
+                add(e("line",{x1:OX,y1:by,x2:OX+deckWpx,y2:by,
+                  stroke:"#888","stroke-width":"0.5","stroke-dasharray":"4,2"}));
+              });
+
+              // Footing dots
+              bRowYs.forEach(by=>{
+                bColXs.forEach(bx=>{
+                  add(e("circle",{cx:bx,cy:by,r:4,fill:"#333",stroke:"#1a1a1a","stroke-width":"0.5"}));
+                });
+              });
+
+              // Stair rectangle on plan
+              if(sr){
+                add(e("rect",{x:sr.x,y:sr.y,width:sr.w,height:sr.h,
+                  fill:"#F5F0E8",stroke:"#1a1a1a","stroke-width":"0.8","stroke-dasharray":"3,2"}));
+                // Stair direction arrows (treads shown as lines)
+                const nT=nRisers;
+                for(let i=0;i<nT;i++){
+                  const f=(i+0.5)/nT;
+                  if(stairFace==="N"||stairFace==="S"){
+                    const ty=sr.y+(stairFace==="S"?f*sr.h:(1-f)*sr.h);
+                    add(e("line",{x1:sr.x,y1:ty,x2:sr.x+sr.w,y2:ty,
+                      stroke:"#aaa","stroke-width":"0.5"}));
+                  } else {
+                    const tx=sr.x+(stairFace==="E"?f*sr.w:(1-f)*sr.w);
+                    add(e("line",{x1:tx,y1:sr.y,x2:tx,y2:sr.y+sr.h,
+                      stroke:"#aaa","stroke-width":"0.5"}));
+                  }
+                }
+              }
+
+              // Section A-A cut line
+              const isEWcut=boardDir==="EW";
+              if(isEWcut){
+                // Cut E-W — horizontal line at mid-depth
+                add(e("line",{x1:OX-20,y1:sectionY,x2:OX+deckWpx+20,y2:sectionY,
+                  stroke:"#1a1a1a","stroke-width":"0.6","stroke-dasharray":"8,3,2,3"}));
+                // A markers
+                [[OX-20,sectionY],[OX+deckWpx+20,sectionY]].forEach(([cx,cy],i)=>{
+                  add(e("circle",{cx,cy,r:8,fill:"white",stroke:"#1a1a1a","stroke-width":"0.8"}));
+                  add(e("text",{x:cx,y:cy+4,fontSize:8,fill:"#1a1a1a","text-anchor":"middle","font-weight":"500"},"A"));
+                });
+              } else {
+                // Cut N-S — vertical line at mid-length
+                add(e("line",{x1:sectionX,y1:OY-20,x2:sectionX,y2:OY+deckDpx+20,
+                  stroke:"#1a1a1a","stroke-width":"0.6","stroke-dasharray":"8,3,2,3"}));
+                [[sectionX,OY-20],[sectionX,OY+deckDpx+20]].forEach(([cx,cy])=>{
+                  add(e("circle",{cx,cy,r:8,fill:"white",stroke:"#1a1a1a","stroke-width":"0.8"}));
+                  add(e("text",{x:cx,y:cy+4,fontSize:8,fill:"#1a1a1a","text-anchor":"middle","font-weight":"500"},"A"));
+                });
+              }
+
+              // North arrow
+              const nx=OX+deckWpx+42,ny=OY+20;
+              add(e("line",{x1:nx,y1:ny+16,x2:nx,y2:ny-2,stroke:"#1a1a1a","stroke-width":"1"}));
+              add(e("polygon",{points:`${nx},${ny-2} ${nx-5},${ny+10} ${nx+5},${ny+10}`,fill:"#1a1a1a"}));
+              add(e("text",{x:nx,y:ny+28,fontSize:9,fill:"#1a1a1a","text-anchor":"middle","font-weight":"600"},"N"));
+
+              // Dimensions outside
+              // Bottom: deck length
+              const dimY=OY+deckDpx+30;
+              add(e("line",{x1:OX,y1:dimY,x2:OX+deckWpx,y2:dimY,stroke:"#555","stroke-width":"0.6"}));
+              add(e("line",{x1:OX,y1:dimY-3,x2:OX,y2:dimY+3,stroke:"#555","stroke-width":"0.6"}));
+              add(e("line",{x1:OX+deckWpx,y1:dimY-3,x2:OX+deckWpx,y2:dimY+3,stroke:"#555","stroke-width":"0.6"}));
+              add(e("text",{x:OX+deckWpx/2,y:dimY+13,fontSize:9,fill:"#333","text-anchor":"middle"},`${Math.round(Lm*1000)}mm`));
+
+              // Right: deck depth
+              const dimX2=OX+deckWpx+30;
+              add(e("line",{x1:dimX2,y1:OY,x2:dimX2,y2:OY+deckDpx,stroke:"#555","stroke-width":"0.6"}));
+              add(e("line",{x1:dimX2-3,y1:OY,x2:dimX2+3,y2:OY,stroke:"#555","stroke-width":"0.6"}));
+              add(e("line",{x1:dimX2-3,y1:OY+deckDpx,x2:dimX2+3,y2:OY+deckDpx,stroke:"#555","stroke-width":"0.6"}));
+              add(e("text",{x:dimX2+14,y:OY+deckDpx/2+3,fontSize:9,fill:"#333",
+                "text-anchor":"middle",transform:`rotate(-90,${dimX2+14},${OY+deckDpx/2})`},`${Math.round(Dm*1000)}mm`));
+
+              // Scale bar
+              const sbx=OX,sby=OY+deckDpx+48;
+              add(e("line",{x1:sbx,y1:sby,x2:sbx+100,y2:sby,stroke:"#333","stroke-width":"1"}));
+              add(e("line",{x1:sbx,y1:sby-4,x2:sbx,y2:sby+4,stroke:"#333","stroke-width":"1"}));
+              add(e("line",{x1:sbx+100,y1:sby-4,x2:sbx+100,y2:sby+4,stroke:"#333","stroke-width":"1"}));
+              add(e("rect",{x:sbx,y:sby-4,width:50,height:4,fill:"#333"}));
+              add(e("text",{x:sbx,y:sby+12,fontSize:7.5,fill:"#333"},"0"));
+              add(e("text",{x:sbx+50,y:sby+12,fontSize:7.5,fill:"#333","text-anchor":"middle"},"1000mm"));
+              add(e("text",{x:sbx+100,y:sby+12,fontSize:7.5,fill:"#333","text-anchor":"middle"},"2000mm"));
+              add(e("text",{x:sbx+110,y:sby+12,fontSize:7.5,fill:"#999"},"Scale 1:20"));
+
+              ref.appendChild(svg);
+            }})
           );
         })()),
-        screen===6&&React.createElement("div",{style:{background:"white",borderRadius:12,border:`1px solid ${BD}`,padding:12,marginBottom:12,fontSize:12,color:"#666",lineHeight:1.6,borderLeft:`3px solid ${Y}`}},
-          React.createElement("b",{style:{color:TX}},"Jeff's read: "),
-          (()=>{
-            const hmm=Number(form.heightMm)||0;
-            const raised=form.deckLevel==="raised";
-            const parts=[];
-            parts.push(raised?"Raised "+form.heightMm+"mm · "+est.rules.nSteps+" risers @ "+est.rules.riser+"mm":"Ground level");
-            parts.push(form.siteCondition==="flat"?"Flat site":"Site needs levelling");
-            parts.push(BOARDS[form.deckingType||"merbau"].label+" "+BOARDS[form.deckingType||"merbau"].w+"mm");
-            if(form.stairType!=="none"){
-              parts.push("Stairs facing "+{"N":"north","S":"south","E":"east","W":"west"}[form.layoutStairs||"S"]);
-            } else {
-              parts.push(hmm>=270?"Stairs — by owner":"No stairs");
-            }
-            if(form.balustradeType!=="none"){
-              parts.push(form.balustradeType+" balustrade");
-            } else {
-              parts.push(hmm>=730?"Balustrade — by owner":"No balustrade");
-            }
-            return parts.join(" · ");
-          })()
-        ),
-        screen===5&&React.createElement(PBtn,{label:"See drawings →",onClick:()=>go(6)}),
+        screen===5&&React.createElement(PBtn,{label:"See my section →",onClick:()=>go(5)}),
         screen===5&&React.createElement(BackBtn,null)
       ),
 
       // ── SCREEN 6: Technical drawings ─────────────────────────────
       screen===6&&React.createElement("div",{className:"fade"},
-        jeff("Your set-out drawings","Calculated from your inputs."),
+        jeff("Section A-A","Calculated from your inputs — 1:10 scale."),
         card((()=>{
           const Lm=parseFloat(form.length)||5;
           const Dm=parseFloat(form.width)||4;
           const FFL=Number(form.heightMm)||300;
           const hasBal=form.balustradeType&&form.balustradeType!=="none";
           const boardDir=form.layoutBoard||"EW";
+          const hasStairs=form.stairType!=="none";
+
+          // ── STAIR RULES (validated) ──────────────────────────
           const nRisers=Math.max(2,Math.ceil(FFL/180));
           const riser=Math.round(FFL/nRisers);
           const going=300;
           const stairRun=nRisers*going;
-          const hasStairs=form.stairType!=="none";
+          const stairAngle=Math.round(Math.atan2(FFL,stairRun)*180/Math.PI);
 
-          // Member sizes mm
-          const DK_H=19,JT_H=90,BR_H=140,PAD_H=400,PAD_W=400,PIR_W=100,FAC_T=19;
-          const JT_SIZE=FFL>1800?140:90;
-          const PIR_H=Math.max(50,FFL-BR_H-JT_H-DK_H);
+          // ── MEMBER SIZES ─────────────────────────────────────
+          const DK_H=19,JT_H=FFL>1800?140:90,BR_H=140,PIR_W=100;
+          const PAD_H=400,PAD_W=400,FAC_T=19;
           const BAL_H=hasBal?(FFL>=1000?1200:1000):0;
+          const PIR_H=Math.max(50,FFL-BR_H-JT_H-DK_H);
 
-          // 1:10 scale — everything in px = mm/10
-          const SC=10;
-          const s=v=>v/SC;  // scale helper
+          // ── 1:10 SCALE ───────────────────────────────────────
+          const SC=1/10;
+          const s=v=>v*SC;
 
-          // Canvas layout
-          const ML=160; const MR=110; const MT=30; const MB=60;
-          const CVS_W=900;
-          const OX=ML; // left edge of deck in px
+          // Minimum pixel sizes for legibility
+          const DK_PX=Math.max(3,s(DK_H));
+          const JT_PX=Math.max(8,s(JT_H));
+          const BR_PX=Math.max(12,s(BR_H));
+          const PIR_PX=s(PIR_H);
+          const PAD_PX=s(PAD_H);
+          const BAL_PX=hasBal?s(BAL_H):0;
+          const STR_PAD_H=Math.max(5,s(60)); // 60mm stringer pad
 
-          // Deck width and stair
+          // Canvas
+          const ML=160,MR=220,MT=hasBal?BAL_PX+30:30,MB=70;
           const deckWpx=s(Dm*1000);
           const stRunPx=hasStairs?s(stairRun):0;
+          const CVS_W=ML+deckWpx+stRunPx+MR;
 
-          // Y coordinates — all to scale at 1:10
-          // Build from top down
-          const BAL_PX=hasBal?s(BAL_H):0;
-          const DK_PX=Math.max(3,s(DK_H));   // 3px minimum for 19mm
-          const JT_PX=s(JT_H);               // 9px
-          const BR_PX=s(BR_H);               // 14px
-          const PIR_PX=s(PIR_H);             // exact scale
-          const PAD_PX=s(PAD_H);             // 40px
-
-          const TOP_SP=hasBal?BAL_PX:MT;
-          const FFL_Y=MT+(hasBal?BAL_PX:0);
+          // Y coords
+          const FFL_Y=MT;
           const DK_TOP=FFL_Y;
           const JT_TOP=DK_TOP+DK_PX;
           const BR_TOP=JT_TOP+JT_PX;
           const BR_BOT=BR_TOP+BR_PX;
           const PIR_TOP=BR_BOT;
-          const GY=PIR_TOP+PIR_PX;          // ground line
-          const PAD_TOP=GY;
+          const GY=PIR_TOP+PIR_PX;
           const PAD_BOT=GY+PAD_PX;
           const BAL_TOP=hasBal?FFL_Y-BAL_PX:FFL_Y;
           const CVS_H=Math.round(PAD_BOT+MB);
+          const OX=ML;
 
-          // Stroke style — black outlines like architectural drawings
-          const STK={stroke:"#1a1a1a",strokeWidth:0.8,fill:"white"};
-          const STK_THIN={stroke:"#1a1a1a",strokeWidth:0.5,fill:"white"};
-          const STK_TIMBER={stroke:"#1a1a1a",strokeWidth:0.8,fill:"#F5F0E8"};
-          const STK_CONCRETE={stroke:"#1a1a1a",strokeWidth:0.8,fill:"#E0E0E0"};
-
-          // Dim line helper — clean architectural style
-          const DV=(x,y1,y2,lbl,right=true)=>{
-            if(Math.abs(y2-y1)<3)return null;
-            const TX=right?x+22:x-22,MY=(y1+y2)/2;
-            return React.createElement("g",null,
-              React.createElement("line",{x1:x,y1:y1,x2:x,y2:y2,stroke:"#333",strokeWidth:0.5}),
-              React.createElement("line",{x1:x-3,y1:y1,x2:x+3,y2:y1,stroke:"#333",strokeWidth:0.5}),
-              React.createElement("line",{x1:x-3,y1:y2,x2:x+3,y2:y2,stroke:"#333",strokeWidth:0.5}),
-              React.createElement("text",{x:TX,y:MY+3,fontSize:8,fill:"#222",
-                textAnchor:"middle",transform:`rotate(-90,${TX},${MY})`},lbl)
-            );
-          };
-          const DH=(x1,x2,y,lbl,above=false)=>{
-            const TY=above?y-10:y+12;
-            return React.createElement("g",null,
-              React.createElement("line",{x1,y1:y,x2,y2:y,stroke:"#333",strokeWidth:0.5}),
-              React.createElement("line",{x1,y1:y-3,x2:x1,y2:y+3,stroke:"#333",strokeWidth:0.5}),
-              React.createElement("line",{x1:x2,y1:y-3,x2,y2:y+3,stroke:"#333",strokeWidth:0.5}),
-              React.createElement("text",{x:(x1+x2)/2,y:TY,fontSize:8,fill:"#222",textAnchor:"middle"},lbl)
-            );
-          };
-
-          // Labels rendered inline below with spacing logic
-          const WLBL=()=>null; // placeholder — labels handled inline
-
-          // Pier positions across deck width
+          // Pier positions
           const nBRows=Math.ceil(Dm*1000/1800)+1;
           const pierXs=Array.from({length:nBRows},(_,i)=>OX+(i/Math.max(1,nBRows-1))*deckWpx);
 
-          // Stringer geometry — notched from solid 300×45
-          const gW=hasStairs?s(going):0;
-          const rH=hasStairs?(GY-FFL_Y)/nRisers:0;
+          // ── STRINGER GEOMETRY (validated component) ───────────
           const x0=OX+deckWpx;
           const y0=FFL_Y;
-          const strD=Math.max(6,s(300)*0.5);
-          const stW=hasStairs?stRunPx:0;
-          const ddx=stW, ddy=GY-FFL_Y;
+          const gW=s(going);
+          const rH=(GY-FFL_Y)/nRisers;
+          const stW=stRunPx;
+          const strD=Math.max(5,s(300)*0.4);
+          // Bottom face normal: for stringer going right+down
+          // perpendicular pointing into stringer body = rotate direction 90° CCW
+          const ddx=stW,ddy=GY-FFL_Y;
           const dlen=Math.sqrt(ddx*ddx+ddy*ddy);
-          const nx=dlen>0?(ddy/dlen)*strD:0;
-          const ny=dlen>0?(-ddx/dlen)*strD:0;
-          // Stringer: solid 300×45 notched from top
-          // Top edge = zig-zag step profile
-          // Bottom edge = straight diagonal offset by stringer depth
+          const fnx=-(ddy/dlen)*strD;
+          const fny= (ddx/dlen)*strD;
+
           const buildStringer=()=>{
-            if(!hasStairs) return "";
-            // Top edge: starts at deck edge, steps RIGHT then DOWN
             const top=[[x0,y0]];
             for(let i=0;i<nRisers;i++){
-              top.push([x0+(i+1)*gW, y0+i*rH]);      // horizontal going
-              if(i<nRisers-1) top.push([x0+(i+1)*gW, y0+(i+1)*rH]); // vertical riser
+              top.push([x0+(i+1)*gW, y0+i*rH]);
+              top.push([x0+(i+1)*gW, y0+(i+1)*rH]);
             }
-            top.push([x0+stW, GY]); // bottom right corner
-            // Bottom edge: parallel to hypotenuse, offset by strD
-            top.push([x0+stW+nx, GY+ny]);
-            top.push([x0+nx, y0+ny]);
+            top.push([x0+stW+fnx, GY+fny]);
+            top.push([x0+fnx, y0+fny]);
             return top.map(([px,py])=>`${px.toFixed(1)},${py.toFixed(1)}`).join(" ");
           };
-          const poly=buildStringer();
+
+          const ns="http://www.w3.org/2000/svg";
+          const el=(tag,attrs,txt)=>{
+            const e=document.createElementNS(ns,tag);
+            Object.entries(attrs).forEach(([k,v])=>e.setAttribute(k,String(v)));
+            if(txt!==undefined)e.textContent=txt;
+            return e;
+          };
 
           return React.createElement("div",null,
             React.createElement("div",{style:{fontSize:10,fontWeight:600,color:"#888",
-              textTransform:"uppercase",letterSpacing:1,marginBottom:8}},"Section elevation"),
-            React.createElement("svg",{width:"100%",
-              viewBox:`0 0 ${CVS_W} ${CVS_H}`,
-              style:{display:"block",background:"white",borderRadius:10,
-                marginBottom:8,border:"1px solid #e5e5e5"}},
+              textTransform:"uppercase",letterSpacing:1,marginBottom:8}},"Section A-A"),
+            React.createElement("div",{ref:ref=>{
+              if(!ref||ref._drawn)return; ref._drawn=true;
+              const svg=document.createElementNS(ns,"svg");
+              svg.setAttribute("width","100%");
+              svg.setAttribute("viewBox",`0 0 ${CVS_W} ${CVS_H}`);
+              svg.style.cssText="display:block;background:white;border-radius:10px;border:1px solid #e5e5e5;margin-bottom:8px";
+              const add=el=>svg.appendChild(el);
 
-              // Scale note
-              React.createElement("text",{x:OX,y:MT-8,fontSize:7.5,fill:"#aaa"},
-                `Section A-A · ${Dm}m × ${Lm}m · FFL ${FFL}mm · ${boardDir} boards · Scale 1:10`),
+              // Title
+              add(el("text",{x:OX,y:MT-12,fontSize:8,fill:"#aaa"},
+                `Section A-A · ${Dm}m × ${Lm}m · FFL ${FFL}mm · ${boardDir} boards · Scale 1:10`));
 
-              // ── SOIL HATCH (light diagonal lines) ──
-              React.createElement("rect",{x:OX-10,y:GY,
-                width:deckWpx+stRunPx+20,height:PAD_PX+10,
-                fill:"#F0ECE4",stroke:"none"}),
-              ...[0,1,2,3,4,5,6,7,8,9,10,11,12].map(i=>
-                React.createElement("line",{key:`sh${i}`,
-                  x1:OX-10+i*22,y1:GY,x2:OX-10+i*22-11,y2:GY+PAD_PX+10,
-                  stroke:"#999",strokeWidth:0.3})),
+              // Soil
+              add(el("rect",{x:OX-10,y:GY,width:deckWpx+stRunPx+20,height:PAD_PX+10,fill:"#F0ECE4"}));
+              for(let i=0;i<14;i++){
+                add(el("line",{x1:OX-10+i*22,y1:GY,x2:OX-10+i*22-11,y2:GY+PAD_PX+10,stroke:"#bbb","stroke-width":"0.35"}));
+              }
 
-              // ── GL LINE ──
-              React.createElement("line",{x1:OX-50,y1:GY,
-                x2:OX+deckWpx+stRunPx+20,y2:GY,
-                stroke:"#1a1a1a",strokeWidth:1.2}),
-              React.createElement("text",{x:OX-52,y:GY+4,fontSize:9,fill:"#1a1a1a",
-                fontWeight:"bold",textAnchor:"end"},"GL"),
+              // GL
+              add(el("line",{x1:OX-80,y1:GY,x2:OX+deckWpx+stRunPx+20,y2:GY,stroke:"#1a1a1a","stroke-width":"1.2"}));
+              add(el("text",{x:OX-82,y:GY+4,fontSize:9,fill:"#1a1a1a","font-weight":"bold","text-anchor":"end"},"GL"));
 
-              // ── FFL DASHED LINE ──
-              React.createElement("line",{x1:OX-50,y1:FFL_Y,
-                x2:OX+deckWpx+stRunPx+10,y2:FFL_Y,
-                stroke:"#1a1a1a",strokeWidth:0.6,strokeDasharray:"6,3"}),
-              React.createElement("text",{x:OX-52,y:FFL_Y+4,fontSize:9,fill:"#1a1a1a",
-                fontWeight:"bold",textAnchor:"end"},"FFL"),
+              // FFL
+              add(el("line",{x1:OX-80,y1:FFL_Y,x2:OX+deckWpx+stRunPx+10,y2:FFL_Y,stroke:"#1a1a1a","stroke-width":"0.6","stroke-dasharray":"5,3"}));
+              add(el("text",{x:OX-82,y:FFL_Y+4,fontSize:9,fill:"#1a1a1a","font-weight":"bold","text-anchor":"end"},"FFL"));
 
-              // ── FOOTINGS — T-shape, flush with GL ──
-              ...pierXs.map((px,i)=>React.createElement("g",{key:`ft${i}`},
-                React.createElement("rect",{x:px-s(PAD_W)/2,y:GY,
-                  width:s(PAD_W),height:PAD_PX,
-                  ...STK_CONCRETE}),
-                // Hatch lines in footing (concrete symbol)
-                ...[1,2,3].map(h=>React.createElement("line",{key:`fh${h}`,
-                  x1:px-s(PAD_W)/2,y1:GY+h*PAD_PX/4,
-                  x2:px+s(PAD_W)/2,y2:GY+h*PAD_PX/4,
-                  stroke:"#999",strokeWidth:0.3}))
-              )),
-
-              // ── PIERS ──
-              ...pierXs.map((px,i)=>React.createElement("g",{key:`pr${i}`},
-                React.createElement("rect",{
-                  x:px-Math.max(5,s(PIR_W)/2),y:PIR_TOP,
-                  width:Math.max(10,s(PIR_W)),height:PIR_PX,
-                  ...STK_CONCRETE}),
+              // Footings — T-shape, flush at GL
+              pierXs.forEach((px,i)=>{
+                // Pad
+                add(el("rect",{x:px-s(PAD_W)/2,y:GY,width:s(PAD_W),height:PAD_PX,fill:"#E8E8E8",stroke:"#1a1a1a","stroke-width":"0.8"}));
+                // Concrete hatch
+                for(let h=1;h<=3;h++) add(el("line",{x1:px-s(PAD_W)/2,y1:GY+h*PAD_PX/4,x2:px+s(PAD_W)/2,y2:GY+h*PAD_PX/4,stroke:"#aaa","stroke-width":"0.35"}));
+                // Pier stem above ground
+                add(el("rect",{x:px-Math.max(5,s(PIR_W)/2),y:PIR_TOP,width:Math.max(10,s(PIR_W)),height:PIR_PX,fill:"#E8E8E8",stroke:"#1a1a1a","stroke-width":"0.8"}));
                 // Stirrup cap
-                React.createElement("rect",{
-                  x:px-Math.max(5,s(PIR_W)/2)-3,y:PIR_TOP-3,
-                  width:Math.max(10,s(PIR_W))+6,height:3,
-                  fill:"#888",stroke:"#1a1a1a",strokeWidth:0.5})
-              )),
+                add(el("rect",{x:px-Math.max(5,s(PIR_W)/2)-3,y:PIR_TOP-3,width:Math.max(10,s(PIR_W))+6,height:3,fill:"#555",stroke:"none"}));
+              });
 
-              // ── BEARER ──
-              React.createElement("rect",{x:OX,y:BR_TOP,
-                width:deckWpx,height:BR_PX,...STK_TIMBER}),
-              // Timber grain lines in bearer
-              ...[1,2,3].map(i=>React.createElement("line",{key:`bg${i}`,
-                x1:OX+deckWpx*i/4,y1:BR_TOP,
-                x2:OX+deckWpx*i/4,y2:BR_BOT,
-                stroke:"#ccc",strokeWidth:0.3})),
-              React.createElement("text",{x:OX+deckWpx/2,y:BR_TOP+BR_PX/2+3,
-                fontSize:8,fill:"#1a1a1a",textAnchor:"middle",fontWeight:500},
-                hasBal?"2/140×45 H4":"140×45 H4"),
+              // Bearer
+              add(el("rect",{x:OX,y:BR_TOP,width:deckWpx,height:BR_PX,fill:"#F5F0E8",stroke:"#1a1a1a","stroke-width":"1"}));
+              add(el("text",{x:OX+deckWpx/2,y:BR_TOP+BR_PX/2+3,fontSize:8,fill:"#1a1a1a","text-anchor":"middle","font-weight":"500"},hasBal?"2/140×45 H4":"140×45 H4"));
 
-              // ── JOISTS — section cuts ──
-              ...[...Array(Math.min(12,Math.ceil(Dm*1000/450)+1))].map((_,i)=>{
-                const jx=OX+(i/Math.max(1,Math.ceil(Dm*1000/450)))*deckWpx;
-                const jw=Math.max(6,Math.min(14,s(JT_H)));
-                return React.createElement("rect",{key:`jt${i}`,
-                  x:jx-jw/2,y:JT_TOP,width:jw,height:JT_PX,
-                  ...STK_TIMBER});
-              }),
+              // Joists
+              const nJoists=Math.min(12,Math.ceil(Dm*1000/450)+1);
+              for(let i=0;i<nJoists;i++){
+                const jx=OX+(i/Math.max(1,nJoists-1))*deckWpx;
+                const jw=Math.max(6,Math.min(12,s(JT_H)));
+                add(el("rect",{x:jx-jw/2,y:JT_TOP,width:jw,height:JT_PX,fill:"#F5F0E8",stroke:"#1a1a1a","stroke-width":"0.7"}));
+              }
 
-              // ── DECKING ──
-              React.createElement("rect",{x:OX,y:DK_TOP,
-                width:deckWpx,height:DK_PX,...STK_TIMBER}),
-              ...[...Array(Math.min(24,Math.ceil(Dm*1000/100)))].map((_,i)=>
-                React.createElement("line",{key:`db${i}`,
-                  x1:OX+i*(deckWpx/Math.ceil(Dm*1000/100)),y1:DK_TOP,
-                  x2:OX+i*(deckWpx/Math.ceil(Dm*1000/100)),y2:DK_TOP+DK_PX,
-                  stroke:"#999",strokeWidth:0.4})),
+              // Decking
+              add(el("rect",{x:OX,y:DK_TOP,width:deckWpx,height:DK_PX,fill:"#F5F0E8",stroke:"#1a1a1a","stroke-width":"0.8"}));
+              const nBoards=Math.min(24,Math.ceil(Dm*1000/100));
+              for(let i=1;i<nBoards;i++){
+                add(el("line",{x1:OX+i*(deckWpx/nBoards),y1:DK_TOP,x2:OX+i*(deckWpx/nBoards),y2:DK_TOP+DK_PX,stroke:"#aaa","stroke-width":"0.4"}));
+              }
 
-              // ── FACIA — left and right, same timber as decking ──
-              // Vertical facia covering joist end grain
-              React.createElement("rect",{x:OX-Math.max(3,s(FAC_T)),y:JT_TOP,
-                width:Math.max(3,s(FAC_T)),height:JT_PX+DK_PX,
-                ...STK_TIMBER}),
-              React.createElement("rect",{x:OX+deckWpx,y:JT_TOP,
-                width:Math.max(3,s(FAC_T)),height:JT_PX+DK_PX,
-                ...STK_TIMBER}),
+              // Facia
+              add(el("rect",{x:OX-Math.max(3,s(FAC_T)),y:JT_TOP,width:Math.max(3,s(FAC_T)),height:JT_PX+DK_PX,fill:"#F5F0E8",stroke:"#1a1a1a","stroke-width":"0.8"}));
+              add(el("rect",{x:OX+deckWpx,y:JT_TOP,width:Math.max(3,s(FAC_T)),height:JT_PX+DK_PX,fill:"#F5F0E8",stroke:"#1a1a1a","stroke-width":"0.8"}));
 
-              // ── BALUSTRADE ──
-              hasBal&&React.createElement("g",null,
-                // Posts
-                React.createElement("rect",{x:OX-4,y:BAL_TOP,width:8,height:BAL_PX,
-                  ...STK}),
-                React.createElement("rect",{x:OX+deckWpx-4,y:BAL_TOP,width:8,height:BAL_PX,
-                  ...STK}),
-                // Top rail
-                React.createElement("rect",{x:OX-6,y:BAL_TOP,width:deckWpx+12,height:5,
-                  ...STK}),
-                // Wire rails
-                ...[0.15,0.28,0.42,0.56,0.70,0.84].map((f,i)=>
-                  React.createElement("line",{key:`wr${i}`,
-                    x1:OX,y1:BAL_TOP+BAL_PX*f,
-                    x2:OX+deckWpx,y2:BAL_TOP+BAL_PX*f,
-                    stroke:"#555",strokeWidth:0.5}))
-              ),
-
-              // ── STRINGER — notched 300×45 ──
-              hasStairs&&React.createElement("g",null,
-                React.createElement("polygon",{points:poly,
-                  fill:"#F5F0E8",stroke:"#1a1a1a",strokeWidth:0.8}),
-                // Treads
-                ...[...Array(nRisers)].map((_,i)=>
-                  React.createElement("rect",{key:`tr${i}`,
-                    x:x0+i*gW,y:y0+i*rH,
-                    width:gW,height:Math.max(3,DK_PX),
-                    fill:"#F5F0E8",stroke:"#1a1a1a",strokeWidth:0.7})
-                ),
-                // Stringer footing
-                React.createElement("rect",{x:x0+stW-s(PAD_W)/2,y:GY,
-                  width:s(PAD_W),height:PAD_PX,
-                  ...STK_CONCRETE}),
-                ...[1,2,3].map(h=>React.createElement("line",{key:`sfh${h}`,
-                  x1:x0+stW-s(PAD_W)/2,y1:GY+h*PAD_PX/4,
-                  x2:x0+stW+s(PAD_W)/2,y2:GY+h*PAD_PX/4,
-                  stroke:"#999",strokeWidth:0.3}))
-              ),
-
-              // ── WORD LABELS RIGHT — spaced to avoid overlap ──
-              // Min 22px gap between labels (each label ~20px tall with sub)
-              (()=>{
-                const RPAD=OX+deckWpx+(hasStairs?stRunPx:0)+72;
-                const lbls=[
-                  [DK_TOP+DK_PX/2,       `Decking 90×19`,         boardDir+" boards"],
-                  [Math.max(JT_TOP+JT_PX/2, DK_TOP+DK_PX/2+22), `Joist ${JT_SIZE}×45 H3`,"@ 450mm ctrs"],
-                  [Math.max(BR_TOP+BR_PX/2, DK_TOP+DK_PX/2+44), hasBal?"2/140×45 H4 bearer":"140×45 H4 bearer", hasBal?"Double — bal. load":null],
-                  [Math.max(PIR_TOP+PIR_PX/2, DK_TOP+DK_PX/2+72),"Uni-Pier","adjustable steel"],
-                  [GY+PAD_PX/2,            "Pad footing",           "400×400×400mm"],
-                ];
-                if(hasStairs) lbls.push([y0+(GY-FFL_Y)*0.55,"Stringer 300×45","notched · open tread"]);
-                return lbls.map(([y,t,s],i)=>React.createElement("g",{key:`lbl${i}`},
-                  React.createElement("text",{x:RPAD,y:y,fontSize:8.5,fill:"#1a1a1a",
-                    textAnchor:"start",fontWeight:500},t),
-                  s&&React.createElement("text",{x:RPAD,y:y+11,fontSize:7.5,fill:"#666",
-                    textAnchor:"start"},s)
-                ));
-              })(),
-
-              // ── RIGHT DIMS ONLY ──
-              // FFL total height
-              DV(OX+deckWpx+18,GY,FFL_Y,`${FFL}mm`,true),
-              // Pier height
-              DV(OX+deckWpx+38,GY,PIR_TOP,`${PIR_H}mm`,true),
               // Balustrade
-              hasBal&&DV(OX+deckWpx+18,FFL_Y,BAL_TOP,`${BAL_H}mm`,true),
-              // Footing depth
-              DV(OX+deckWpx+58,PAD_TOP,PAD_BOT,"400mm",true),
-              // Member depths — stacked small dims left of drawing
-              DV(OX-42,DK_TOP,DK_TOP+DK_PX,"19",false),
-              DV(OX-42,JT_TOP,JT_TOP+JT_PX,"90",false),
-              DV(OX-42,BR_TOP,BR_BOT,"140",false),
+              if(hasBal){
+                add(el("rect",{x:OX-5,y:BAL_TOP,width:10,height:BAL_PX,fill:"#F5F0E8",stroke:"#1a1a1a","stroke-width":"0.8"}));
+                add(el("rect",{x:OX+deckWpx-5,y:BAL_TOP,width:10,height:BAL_PX,fill:"#F5F0E8",stroke:"#1a1a1a","stroke-width":"0.8"}));
+                add(el("rect",{x:OX-7,y:BAL_TOP,width:deckWpx+14,height:5,fill:"#F5F0E8",stroke:"#1a1a1a","stroke-width":"0.8"}));
+                for(let i=0;i<7;i++){
+                  add(el("line",{x1:OX,y1:BAL_TOP+BAL_PX*(i+1)/8,x2:OX+deckWpx,y2:BAL_TOP+BAL_PX*(i+1)/8,stroke:"#888","stroke-width":"0.5"}));
+                }
+              }
+
+              // Stringer — validated component
+              if(hasStairs){
+                add(el("polygon",{points:buildStringer(),fill:"#F5F0E8",stroke:"#1a1a1a","stroke-width":"0.9"}));
+                // Treads
+                for(let i=0;i<nRisers;i++){
+                  add(el("rect",{x:x0+i*gW,y:y0+i*rH,width:gW,height:Math.max(3,DK_PX),fill:"#F5F0E8",stroke:"#1a1a1a","stroke-width":"0.7"}));
+                }
+                // Stringer pads — 300×300×60mm at base
+                const spW=s(300),spH=Math.max(4,s(60));
+                add(el("rect",{x:x0+stW-spW/2,y:GY,width:spW,height:spH,fill:"#E8E8E8",stroke:"#1a1a1a","stroke-width":"0.7"}));
+                for(let h=1;h<=2;h++) add(el("line",{x1:x0+stW-spW/2,y1:GY+h*spH/3,x2:x0+stW+spW/2,y2:GY+h*spH/3,stroke:"#aaa","stroke-width":"0.3"}));
+                // Angle label
+                add(el("text",{x:x0+stW*0.42,y:y0+(GY-FFL_Y)*0.55,fontSize:8,fill:"#666","text-anchor":"middle"},`${stairAngle}°`));
+              }
+
+              // ── LABELS — right side, spaced 22px apart min ──
+              const LPAD=OX+deckWpx+(hasStairs?stRunPx:0)+18;
+              const lbls=[
+                {y:DK_TOP+DK_PX/2,     t:"Decking 90×19",   s:boardDir+" boards"},
+                {y:Math.max(JT_TOP+JT_PX/2, DK_TOP+24),  t:`Joist ${JT_H}×45 H3`, s:"@ 450mm ctrs"},
+                {y:Math.max(BR_TOP+BR_PX/2, DK_TOP+48),  t:hasBal?"2/140×45 H4":"140×45 H4", s:"bearer"},
+                {y:PIR_TOP+PIR_PX/2,   t:"Uni-Pier",         s:`${PIR_H}mm`},
+                {y:GY+PAD_PX*0.45,     t:"Pad footing",      s:"400×400×400mm"},
+              ];
+              if(hasStairs) lbls.push({y:y0+(GY-y0)*0.45,t:"Stringer 300×45",s:"notched · open tread"});
+              if(hasBal) lbls.push({y:BAL_TOP+BAL_PX/2,t:`Balustrade`,s:`${BAL_H}mm`});
+
+              lbls.forEach(({y,t,s},i)=>{
+                add(el("text",{x:LPAD,y:y+2,fontSize:8.5,fill:"#1a1a1a","font-weight":"500"},t));
+                if(s) add(el("text",{x:LPAD,y:y+13,fontSize:7.5,fill:"#666"},s));
+              });
+
+              // ── DIMS — left side for member depths, right for heights ──
+              // Member depth brackets (left of deck)
+              [[DK_TOP,DK_TOP+DK_PX,"19"],[JT_TOP,JT_TOP+JT_PX,"90"],[BR_TOP,BR_BOT,"140"]].forEach(([y1,y2,lbl])=>{
+                const bx=OX-12;
+                add(el("line",{x1:OX-2,y1:y1,x2:bx,y2:y1,stroke:"#888","stroke-width":"0.5"}));
+                add(el("line",{x1:OX-2,y1:y2,x2:bx,y2:y2,stroke:"#888","stroke-width":"0.5"}));
+                add(el("line",{x1:bx,y1:y1,x2:bx,y2:y2,stroke:"#888","stroke-width":"0.5"}));
+                add(el("text",{x:bx-2,y:(y1+y2)/2+3,fontSize:7.5,fill:"#666","text-anchor":"end"},lbl));
+              });
+
+              // FFL dim right
+              const dvx=OX+deckWpx+(hasStairs?stRunPx:0)+LPAD-OX+60;
+              // Keep simple — just two key dims
+              const addDV=(x,y1,y2,lbl)=>{
+                if(Math.abs(y2-y1)<4)return;
+                const my=(y1+y2)/2;
+                add(el("line",{x1:x,y1:y1,x2:x,y2:y2,stroke:"#555","stroke-width":"0.5"}));
+                add(el("line",{x1:x-3,y1:y1,x2:x+3,y2:y1,stroke:"#555","stroke-width":"0.5"}));
+                add(el("line",{x1:x-3,y1:y2,x2:x+3,y2:y2,stroke:"#555","stroke-width":"0.5"}));
+                add(el("text",{x:x+12,y:my+3,fontSize:8,fill:"#333","text-anchor":"middle",transform:`rotate(-90,${x+12},${my})`},lbl));
+              };
+              // Place dims between labels and edge of SVG
+              const dimCol1=OX-42, dimCol2=OX-58;
+              addDV(dimCol1,GY,FFL_Y,`${FFL}mm FFL`);
+              addDV(dimCol2,GY,PIR_TOP,`${PIR_H}mm pier`);
+              if(hasBal) addDV(OX+deckWpx+(hasStairs?stRunPx:0)+8,FFL_Y,BAL_TOP,`${BAL_H}mm`);
+              addDV(OX-70,GY,GY+PAD_PX,"400mm");
 
               // Bottom dims
-              DH(OX,OX+deckWpx,PAD_BOT+16,`${Math.round(Dm*1000)}mm`),
-              hasStairs&&DH(OX+deckWpx,OX+deckWpx+stRunPx,PAD_BOT+16,`${stairRun}mm`),
+              const dimY=GY+PAD_PX+20;
+              [[OX,OX+deckWpx,`${Math.round(Dm*1000)}mm`],
+               ...(hasStairs?[[OX+deckWpx,OX+deckWpx+stRunPx,`${stairRun}mm`]]:[])]
+              .forEach(([x1,x2,lbl])=>{
+                add(el("line",{x1,y1:dimY,x2,y2:dimY,stroke:"#555","stroke-width":"0.6"}));
+                add(el("line",{x1,y1:dimY-3,x2:x1,y2:dimY+3,stroke:"#555","stroke-width":"0.6"}));
+                add(el("line",{x1:x2,y1:dimY-3,x2,y2:dimY+3,stroke:"#555","stroke-width":"0.6"}));
+                add(el("text",{x:(x1+x2)/2,y:dimY+13,fontSize:9,fill:"#333","text-anchor":"middle"},lbl));
+              });
 
               // Scale bar
-              React.createElement("line",{x1:OX,y1:CVS_H-16,x2:OX+100,y2:CVS_H-16,
-                stroke:"#333",strokeWidth:1}),
-              React.createElement("line",{x1:OX,y1:CVS_H-20,x2:OX,y2:CVS_H-12,
-                stroke:"#333",strokeWidth:1}),
-              React.createElement("line",{x1:OX+100,y1:CVS_H-20,x2:OX+100,y2:CVS_H-12,
-                stroke:"#333",strokeWidth:1}),
-              React.createElement("rect",{x:OX,y:CVS_H-20,width:50,height:4,fill:"#333"}),
-              React.createElement("text",{x:OX,y:CVS_H-6,fontSize:7.5,fill:"#333"},"0"),
-              React.createElement("text",{x:OX+50,y:CVS_H-6,fontSize:7.5,fill:"#333",textAnchor:"middle"},"500mm"),
-              React.createElement("text",{x:OX+100,y:CVS_H-6,fontSize:7.5,fill:"#333",textAnchor:"middle"},"1000mm"),
-              React.createElement("text",{x:OX+108,y:CVS_H-6,fontSize:7.5,fill:"#999"},"Scale 1:10 · AS1684 · AS1657")
-            )
+              const sbx=OX,sby=CVS_H-18;
+              add(el("line",{x1:sbx,y1:sby,x2:sbx+100,y2:sby,stroke:"#333","stroke-width":"1"}));
+              add(el("line",{x1:sbx,y1:sby-4,x2:sbx,y2:sby+4,stroke:"#333","stroke-width":"1"}));
+              add(el("line",{x1:sbx+100,y1:sby-4,x2:sbx+100,y2:sby+4,stroke:"#333","stroke-width":"1"}));
+              add(el("rect",{x:sbx,y:sby-4,width:50,height:4,fill:"#333"}));
+              add(el("text",{x:sbx,y:sby+11,fontSize:7.5,fill:"#333"},"0"));
+              add(el("text",{x:sbx+50,y:sby+11,fontSize:7.5,fill:"#333","text-anchor":"middle"},"500mm"));
+              add(el("text",{x:sbx+100,y:sby+11,fontSize:7.5,fill:"#333","text-anchor":"middle"},"1000mm"));
+              add(el("text",{x:sbx+112,y:sby+11,fontSize:7.5,fill:"#999"},"Scale 1:10 · AS1684 · AS1657"));
+
+              ref.appendChild(svg);
+            }})
           );
         })()),
         screen===6&&React.createElement(PBtn,{label:"See 3D set out →",onClick:()=>go(6)}),

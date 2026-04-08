@@ -424,8 +424,7 @@ function App(){
     length:"5.0",width:"4.0",siteCondition:"",deckLevel:"ground",
     heightMm:800,houseWall:"bottom",layoutBoard:"EW",layoutStairs:"S",layoutStairsFull:false,
     deckingType:"merbau",stairType:"standard",stairWidthMm:1200,
-    balustradeType:"none",poolAdjacent:false,
-    placements:{bbq:null,alfresco:null}
+    balustradeType:"none",poolAdjacent:false,alfrescoZone:"none",bbqZone:"none"
   });
   const [errors,setErrors]=useState({});
   const upd=(k,v)=>setForm(p=>({...p,[k]:v}));

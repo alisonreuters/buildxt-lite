@@ -57,6 +57,7 @@ function getWindRegion(pc){
 const BOARDS={
   merbau:     {label:"Merbau",w:90, gap:6,type:"hardwood", price:5.52,real:true, color:"#7B3410"},
   spotted_gum:{label:"Spotted Gum",w:90,gap:6,type:"hardwood",price:8.50,real:false,color:"#C4956A"},
+  spotted_gum_140:{label:"Spotted Gum 140",w:140,gap:6,type:"hardwood",price:24.00,real:true,color:"#C4956A"},
   blue_gum:   {label:"Blue Gum",w:90, gap:6,type:"hardwood", price:8.20,real:false,color:"#8FAF80"},
   pine_budget:{label:"Pine (grooved)",w:90,gap:6,type:"pine",  price:3.80,real:false,color:"#DEB887"},
   nextgen_140:{label:"NextGen 140",w:140,gap:5,type:"composite",price:18.50,real:false,color:"#7A8C98"},
@@ -323,7 +324,7 @@ function App(){
     React.createElement("span",{style:{flexShrink:0}},"⚠"),msg);
 
   const boardGroups=[
-    {group:"Hardwood",keys:["merbau","spotted_gum","blue_gum"]},
+    {group:"Hardwood",keys:["merbau","spotted_gum","spotted_gum_140","blue_gum"]},
     {group:"Composite",keys:["nextgen_140","nextgen_210","modclad"]},
     {group:"Budget",keys:["pine_budget"]},
   ];
@@ -553,8 +554,8 @@ function App(){
               `${est.rules.nSteps} risers @ ${est.rules.riser}mm · 300mm going · stair run ${est.rules.nSteps*300}mm · max width ${Math.round(parseFloat(form.length)*1000)}mm`)
           )
         )),
-        screen===5&&React.createElement(PBtn,{label:"See my layout →",onClick:()=>go(5)}),
-        screen===5&&React.createElement(BackBtn,null)
+        screen===4&&React.createElement(PBtn,{label:"See my layout →",onClick:()=>go(5)}),
+        screen===4&&React.createElement(BackBtn,null)
       ),
 
       // ── SCREEN 5: Layout plan ───────────────────────────────────

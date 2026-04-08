@@ -702,11 +702,50 @@ function App(){
           )
         )),
         card(React.createElement("div",null,
+          lbl("Deck zones"),
+          React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginTop:8}},
+            React.createElement("div",null,
+              React.createElement("div",{style:{fontSize:12,color:"#aaa",marginBottom:6,fontWeight:500}},"Alfresco"),
+              React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:5}},
+                [["none","None"],["SW","SW"],["SE","SE"],["NW","NW"]].map(([k,l])=>
+                  React.createElement("button",{key:k,onClick:()=>upd("alfrescoZone",k),
+                    style:{padding:"8px 4px",borderRadius:8,fontSize:12,fontWeight:500,cursor:"pointer",
+                      border:form.alfrescoZone===k?`2px solid #378ADD`:`1px solid ${BD}`,
+                      background:form.alfrescoZone===k?"#E6F1FB":"white"}},l)
+                )
+              )
+            ),
+            React.createElement("div",null,
+              React.createElement("div",{style:{fontSize:12,color:"#aaa",marginBottom:6,fontWeight:500}},"BBQ"),
+              React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:5}},
+                [["none","None"],["SE","SE"],["SW","SW"],["NE","NE"]].map(([k,l])=>
+                  React.createElement("button",{key:k,onClick:()=>upd("bbqZone",k),
+                    style:{padding:"8px 4px",borderRadius:8,fontSize:12,fontWeight:500,cursor:"pointer",
+                      border:form.bbqZone===k?`2px solid #BA7517`:`1px solid ${BD}`,
+                      background:form.bbqZone===k?"#FAEEDA":"white"}},l)
+                )
+              )
+            )
+          )
+        )),
+        card(React.createElement("div",null,
           React.createElement("div",{style:{fontSize:13,fontWeight:600,marginBottom:8,color:"#555"}},"Stairs"),
           React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7,marginBottom:form.stairType!=="none"?10:0}},
             [["none","No stairs"],["standard","Standard"],["wide","Wide"],["landing","With landing"]].map(([k,l])=>
               React.createElement("button",{key:k,style:{padding:"10px",borderRadius:11,border:form.stairType===k?`2px solid ${Y}`:`1px solid ${BD}`,background:form.stairType===k?"#FFF9E6":"white",fontSize:13,fontWeight:form.stairType===k?700:400},
                 onClick:()=>{upd("stairType",k);if(k==="none")upd("stairWidthMm",0);else if(!form.stairWidthMm)upd("stairWidthMm",1200);}},l))
+          ),
+          form.stairType!=="none"&&React.createElement("div",{style:{marginBottom:10}},
+            lbl("Stair face — which side does it exit?"),
+            React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:6,marginBottom:10}},
+              [["N","North"],["S","South"],["E","East"],["W","West"]].map(([k,l])=>
+                React.createElement("button",{key:k,
+                  onClick:()=>upd("layoutStairs",k),
+                  style:{padding:"9px 4px",borderRadius:10,fontSize:13,fontWeight:500,
+                    border:form.layoutStairs===k?`2px solid ${Y}`:`1px solid ${BD}`,
+                    background:form.layoutStairs===k?"#FFF9E6":"white",cursor:"pointer"}},l)
+                )
+            )
           ),
           form.stairType!=="none"&&React.createElement("div",null,
             React.createElement("div",{style:{display:"flex",gap:8,alignItems:"center"}},
@@ -754,39 +793,47 @@ function App(){
           });
           const D=R.draw;
 
-          // Scale to fit ~280x220px drawing area
-          const SC=Math.min(0.05,280/(D.deckWmm),220/(D.deckDmm));
-          const deckWpx=D.deckWmm*SC, deckDpx=D.deckDmm*SC;
-          const stRunPx=D.hasStairs?D.stair.stairRun*SC:0;
-          const stWpx=Math.min((D.stairWidthMm||1200)*SC, deckWpx*0.6);
+          // ── FIXED CANVAS & PLACEHOLDER ZONES ─────────────────
+          // These never change. Deck scales to fit. Nothing overlaps.
+          const CVS_W=500, CVS_H=420;
+          const ZONE_TOP=42;    // title + N + A circle
+          const ZONE_BOT=48;    // S + A circle + length dim
+          const ZONE_LFT=62;    // W label + depth dim
+          const ZONE_RGT=52;    // E label + depth dim
+          const DRAW_W=CVS_W-ZONE_LFT-ZONE_RGT;  // 386px
+          const DRAW_H=CVS_H-ZONE_TOP-ZONE_BOT;  // 330px
 
-          // Margins — generous so nothing ever overlaps
-          const ML=50,MR=50,MT=50,MB=50;
-          const stairBelow=D.hasStairs&&(D.stairFace==="S");
-          const stairAbove=D.hasStairs&&(D.stairFace==="N");
-          const stairRight=D.hasStairs&&(D.stairFace==="E");
-          const stairLeft=D.hasStairs&&(D.stairFace==="W");
-          const CVS_W=Math.round(deckWpx+ML+MR+30+(stairRight?stRunPx+10:0)+(stairLeft?stRunPx+10:0));
-          const CVS_H=Math.round(deckDpx+MT+MB+(stairBelow?stRunPx+10:0)+(stairAbove?stRunPx+10:0));
-          const OX=ML+(stairLeft?stRunPx+10:0);
-          const OY=MT+(stairAbove?stRunPx+10:0);
+          // Scale: deck fits in drawing zone
+          const SC=Math.min(DRAW_W/(D.deckWmm), DRAW_H/(D.deckDmm));
+
+          const deckWpx=D.deckWmm*SC;
+          const deckDpx=D.deckDmm*SC;
+
+          // Deck centred in drawing zone
+          const OX=ZONE_LFT+(DRAW_W-deckWpx)/2;
+          const OY=ZONE_TOP+(DRAW_H-deckDpx)/2;
+
+          // Stair — fits inside drawing zone, scaled same as deck
+          const stRunPx=D.hasStairs?D.stair.stairRun*SC:0;
+          const stWpx=D.hasStairs?Math.min(D.stairWidthMm*SC, deckWpx*0.6):0;
+          const stairRects={
+            N:{x:OX+(deckWpx-stWpx)/2, y:OY-stRunPx,    w:stWpx,   h:stRunPx},
+            S:{x:OX+(deckWpx-stWpx)/2, y:OY+deckDpx,    w:stWpx,   h:stRunPx},
+            E:{x:OX+deckWpx,           y:OY+(deckDpx-stWpx)/2, w:stRunPx, h:stWpx},
+            W:{x:OX-stRunPx,           y:OY+(deckDpx-stWpx)/2, w:stRunPx, h:stWpx},
+          };
+          const sr=D.hasStairs?(stairRects[D.stairFace]||stairRects.S):null;
+
+          // Fixed placeholder positions
+          const midX=OX+deckWpx/2;  // deck horizontal centre
+          const midY=OY+deckDpx/2;  // deck vertical centre
+
+          // Section cut line — always through deck centre
+          const sectNS=D.sectionCutDir==="NS";
 
           // Footing grid
           const bRowYs=Array.from({length:R.nBearerRows},(_,i)=>OY+(i/Math.max(1,R.nBearerRows-1))*deckDpx);
           const bColXs=Array.from({length:R.nPostsPerRow},(_,i)=>OX+(i/Math.max(1,R.nPostsPerRow-1))*deckWpx);
-
-          // Stair rectangle
-          const srs={
-            N:{x:OX+(deckWpx-stWpx)/2,y:OY-stRunPx,w:stWpx,h:stRunPx},
-            S:{x:OX+(deckWpx-stWpx)/2,y:OY+deckDpx,w:stWpx,h:stRunPx},
-            E:{x:OX+deckWpx,y:OY+(deckDpx-stWpx)/2,w:stRunPx,h:stWpx},
-            W:{x:OX-stRunPx,y:OY+(deckDpx-stWpx)/2,w:stRunPx,h:stWpx},
-          };
-          const sr=D.hasStairs?(srs[D.stairFace]||srs.S):null;
-
-          // Section A-A position — mid deck, extended well outside
-          const sectionY=OY+deckDpx/2;
-          const sectionX=OX+deckWpx/2;
 
           const ns="http://www.w3.org/2000/svg";
           const e=(tag,attrs,txt)=>{
@@ -807,31 +854,67 @@ function App(){
               svg.style.cssText="display:block;background:white;border-radius:10px;border:1px solid #e5e5e5;margin-bottom:8px";
               const add=el=>svg.appendChild(el);
 
-              // Title
-              add(e("text",{x:OX,y:16,fontSize:6.5,fill:"#ccc"},
+              // ── TOP ZONE ─────────────────────────────────────
+              // Title — top left
+              add(e("text",{x:ZONE_LFT,y:12,fontSize:6.5,fill:"#ccc"},
                 `Plan view · ${D.Lm}m × ${D.Dm}m · FFL ${D.FFL}mm · ${D.boardDir} boards`));
+              // N label — top centre
+              add(e("text",{x:midX,y:16,fontSize:8,fill:"#ccc","text-anchor":"middle"},"N"));
+              // A circle top — below N
+              add(e("circle",{cx:sectNS?midX:ZONE_LFT-14,cy:sectNS?28:midY,r:6,fill:"white",stroke:"#888","stroke-width":"0.8"}));
+              add(e("text",{x:sectNS?midX:ZONE_LFT-14,y:sectNS?32:midY+3,fontSize:7,fill:"#888","text-anchor":"middle","font-weight":"600"},"A"));
 
-              // N/S/E/W — small, light grey, well clear of dims
-              add(e("text",{x:OX+deckWpx/2,y:OY-8,fontSize:8,fill:"#ccc","text-anchor":"middle"},"N"));
-              add(e("text",{x:OX+deckWpx/2,y:OY+deckDpx+14,fontSize:8,fill:"#ccc","text-anchor":"middle"},"S"));
-              add(e("text",{x:OX-10,y:OY+deckDpx/2+3,fontSize:8,fill:"#ccc","text-anchor":"end"},"W"));
-              add(e("text",{x:OX+deckWpx+10,y:OY+deckDpx/2+3,fontSize:8,fill:"#ccc","text-anchor":"start"},"E"));
+              // ── BOTTOM ZONE ───────────────────────────────────
+              // S label
+              add(e("text",{x:midX,y:CVS_H-34,fontSize:8,fill:"#ccc","text-anchor":"middle"},"S"));
+              // A circle bottom
+              add(e("circle",{cx:sectNS?midX:CVS_W-ZONE_RGT+14,cy:sectNS?CVS_H-22:midY,r:6,fill:"white",stroke:"#888","stroke-width":"0.8"}));
+              add(e("text",{x:sectNS?midX:CVS_W-ZONE_RGT+14,y:sectNS?CVS_H-18:midY+3,fontSize:7,fill:"#888","text-anchor":"middle","font-weight":"600"},"A"));
+              // Length dim — bottom centre
+              const dimY=CVS_H-10;
+              add(e("line",{x1:OX,y1:dimY-4,x2:OX+deckWpx,y2:dimY-4,stroke:"#555","stroke-width":"0.6"}));
+              add(e("line",{x1:OX,y1:dimY-7,x2:OX,y2:dimY-1,stroke:"#555","stroke-width":"0.6"}));
+              add(e("line",{x1:OX+deckWpx,y1:dimY-7,x2:OX+deckWpx,y2:dimY-1,stroke:"#555","stroke-width":"0.6"}));
+              add(e("text",{x:midX,y:dimY+6,fontSize:9,fill:"#333","text-anchor":"middle"},`${D.Lm}m`));
 
-              // House wall thick line
+              // ── LEFT ZONE ─────────────────────────────────────
+              // W label
+              add(e("text",{x:10,y:midY+3,fontSize:8,fill:"#ccc","text-anchor":"middle"},"W"));
+              // Depth dim
+              const dimX=ZONE_LFT-28;
+              add(e("line",{x1:dimX,y1:OY,x2:dimX,y2:OY+deckDpx,stroke:"#555","stroke-width":"0.6"}));
+              add(e("line",{x1:dimX-3,y1:OY,x2:dimX+3,y2:OY,stroke:"#555","stroke-width":"0.6"}));
+              add(e("line",{x1:dimX-3,y1:OY+deckDpx,x2:dimX+3,y2:OY+deckDpx,stroke:"#555","stroke-width":"0.6"}));
+              add(e("text",{x:dimX-14,y:midY+3,fontSize:9,fill:"#333","text-anchor":"middle",
+                transform:`rotate(-90,${dimX-14},${midY})`},`${D.Dm}m`));
+
+              // ── RIGHT ZONE ────────────────────────────────────
+              // E label
+              add(e("text",{x:CVS_W-10,y:midY+3,fontSize:8,fill:"#ccc","text-anchor":"middle"},"E"));
+
+              // ── SECTION CUT LINE ──────────────────────────────
+              if(sectNS){
+                add(e("line",{x1:midX,y1:ZONE_TOP-14,x2:midX,y2:CVS_H-ZONE_BOT+14,
+                  stroke:"#aaa","stroke-width":"0.6","stroke-dasharray":"8,3,2,3"}));
+              } else {
+                add(e("line",{x1:ZONE_LFT-14,y1:midY,x2:CVS_W-ZONE_RGT+14,y2:midY,
+                  stroke:"#aaa","stroke-width":"0.6","stroke-dasharray":"8,3,2,3"}));
+              }
+
+              // ── HOUSE WALL (thick line) ───────────────────────
               const hwLine={
-                top:[OX,OY,OX+deckWpx,OY],
+                top:   [OX,OY,OX+deckWpx,OY],
                 bottom:[OX,OY+deckDpx,OX+deckWpx,OY+deckDpx],
-                left:[OX,OY,OX,OY+deckDpx],
-                right:[OX+deckWpx,OY,OX+deckWpx,OY+deckDpx],
+                left:  [OX,OY,OX,OY+deckDpx],
+                right: [OX+deckWpx,OY,OX+deckWpx,OY+deckDpx],
               };
               const hl=hwLine[D.houseWall]||hwLine.bottom;
               add(e("line",{x1:hl[0],y1:hl[1],x2:hl[2],y2:hl[3],stroke:"#1a1a1a","stroke-width":"4"}));
 
-              // Stair rectangle — before deck outline
+              // ── STAIR RECTANGLE ───────────────────────────────
               if(sr){
                 add(e("rect",{x:sr.x,y:sr.y,width:sr.w,height:sr.h,
                   fill:"#F5F0E8",stroke:"#1a1a1a","stroke-width":"0.8","stroke-dasharray":"4,3"}));
-                // Tread lines full width
                 const isNS=D.stairFace==="N"||D.stairFace==="S";
                 for(let i=1;i<D.stair.nRisers;i++){
                   const f=i/D.stair.nRisers;
@@ -845,60 +928,54 @@ function App(){
                 }
               }
 
-              // Deck outline
+              // ── DECK OUTLINE ──────────────────────────────────
               add(e("rect",{x:OX,y:OY,width:deckWpx,height:deckDpx,
                 fill:"#FAFAF8",stroke:"#1a1a1a","stroke-width":"1.2"}));
 
-              // Board lines — light
+              // ── BOARD LINES (very light) ──────────────────────
               const isEW=D.boardDir==="EW";
-              const bCount=Math.ceil((isEW?deckDpx:deckWpx)/6);
+              const bStep=Math.max(4, (isEW?D.decking.W:D.decking.W)*SC);
+              const bCount=Math.floor((isEW?deckDpx:deckWpx)/bStep);
               for(let i=1;i<bCount;i++){
-                const f=i/bCount;
+                const p=i*bStep;
                 add(e("line",{
-                  x1:isEW?OX:OX+f*deckWpx, y1:isEW?OY+f*deckDpx:OY,
-                  x2:isEW?OX+deckWpx:OX+f*deckWpx, y2:isEW?OY+f*deckDpx:OY+deckDpx,
+                  x1:isEW?OX:OX+p,         y1:isEW?OY+p:OY,
+                  x2:isEW?OX+deckWpx:OX+p, y2:isEW?OY+p:OY+deckDpx,
                   stroke:"#e8e8e8","stroke-width":"0.5"}));
               }
 
-              // Bearer lines — thin solid
-              bRowYs.forEach(by=>add(e("line",{x1:OX,y1:by,x2:OX+deckWpx,y2:by,stroke:"#bbb","stroke-width":"0.6"})));
+              // ── BEARER LINES ──────────────────────────────────
+              bRowYs.forEach(by=>add(e("line",{x1:OX,y1:by,x2:OX+deckWpx,y2:by,
+                stroke:"#bbb","stroke-width":"0.6"})));
 
-              // Footing dots
+              // ── FOOTING DOTS ──────────────────────────────────
               bRowYs.forEach(by=>bColXs.forEach(bx=>{
                 add(e("circle",{cx:bx,cy:by,r:4,fill:"#1a1a1a",stroke:"white","stroke-width":"1.2"}));
               }));
 
-              // Section A-A — smaller, sits just outside deck edge
-              const ext=16;
-              if(D.sectionCutDir==="NS"){
-                add(e("line",{x1:sectionX,y1:OY-ext,x2:sectionX,y2:OY+deckDpx+ext,
-                  stroke:"#888","stroke-width":"0.6","stroke-dasharray":"8,3,2,3"}));
-                [[sectionX,OY-ext-8],[sectionX,OY+deckDpx+ext+8]].forEach(([x,y])=>{
-                  add(e("circle",{cx:x,cy:y,r:6,fill:"white",stroke:"#888","stroke-width":"0.8"}));
-                  add(e("text",{x,y:y+3,fontSize:7,fill:"#888","text-anchor":"middle","font-weight":"600"},"A"));
-                });
-              } else {
-                add(e("line",{x1:OX-ext,y1:sectionY,x2:OX+deckWpx+ext,y2:sectionY,
-                  stroke:"#888","stroke-width":"0.6","stroke-dasharray":"8,3,2,3"}));
-                [[OX-ext-8,sectionY],[OX+deckWpx+ext+8,sectionY]].forEach(([x,y])=>{
-                  add(e("circle",{cx:x,cy:y,r:6,fill:"white",stroke:"#888","stroke-width":"0.8"}));
-                  add(e("text",{x,y:y+3,fontSize:7,fill:"#888","text-anchor":"middle","font-weight":"600"},"A"));
-                });
+              // ── ALFRESCO ZONE (if placed) ─────────────────────
+              if(form.alfrescoZone&&form.alfrescoZone!=="none"){
+                const azW=deckWpx*0.5, azH=deckDpx*0.45;
+                const azPos={NW:{x:OX,y:OY},NE:{x:OX+deckWpx-azW,y:OY},
+                             SW:{x:OX,y:OY+deckDpx-azH},SE:{x:OX+deckWpx-azW,y:OY+deckDpx-azH}};
+                const az=azPos[form.alfrescoZone]||azPos.SW;
+                add(e("rect",{x:az.x,y:az.y,width:azW,height:azH,
+                  fill:"#E6F1FB",stroke:"#378ADD","stroke-width":"0.7","stroke-dasharray":"3,2","opacity":"0.7"}));
+                add(e("text",{x:az.x+azW/2,y:az.y+azH/2+4,fontSize:8,fill:"#185FA5",
+                  "text-anchor":"middle"},"Alfresco"));
               }
 
-              // Dimensions in metres — bottom and right
-              const dimY=OY+deckDpx+(stairBelow?stRunPx+14:14);
-              add(e("line",{x1:OX,y1:dimY,x2:OX+deckWpx,y2:dimY,stroke:"#555","stroke-width":"0.6"}));
-              add(e("line",{x1:OX,y1:dimY-3,x2:OX,y2:dimY+3,stroke:"#555","stroke-width":"0.6"}));
-              add(e("line",{x1:OX+deckWpx,y1:dimY-3,x2:OX+deckWpx,y2:dimY+3,stroke:"#555","stroke-width":"0.6"}));
-              add(e("text",{x:OX+deckWpx/2,y:dimY+13,fontSize:9,fill:"#333","text-anchor":"middle"},`${D.Lm}m`));
-
-              const dimX=OX+deckWpx+(stairRight?stRunPx+28:28);
-              add(e("line",{x1:dimX,y1:OY,x2:dimX,y2:OY+deckDpx,stroke:"#555","stroke-width":"0.6"}));
-              add(e("line",{x1:dimX-3,y1:OY,x2:dimX+3,y2:OY,stroke:"#555","stroke-width":"0.6"}));
-              add(e("line",{x1:dimX-3,y1:OY+deckDpx,x2:dimX+3,y2:OY+deckDpx,stroke:"#555","stroke-width":"0.6"}));
-              add(e("text",{x:dimX+14,y:OY+deckDpx/2+3,fontSize:9,fill:"#333",
-                "text-anchor":"middle",transform:`rotate(-90,${dimX+14},${OY+deckDpx/2})`},`${D.Dm}m`));
+              // ── BBQ ZONE (if placed) ──────────────────────────
+              if(form.bbqZone&&form.bbqZone!=="none"){
+                const bzS=Math.min(deckWpx,deckDpx)*0.22;
+                const bzPos={NW:{x:OX+4,y:OY+4},NE:{x:OX+deckWpx-bzS-4,y:OY+4},
+                             SW:{x:OX+4,y:OY+deckDpx-bzS-4},SE:{x:OX+deckWpx-bzS-4,y:OY+deckDpx-bzS-4}};
+                const bz=bzPos[form.bbqZone]||bzPos.SE;
+                add(e("rect",{x:bz.x,y:bz.y,width:bzS,height:bzS,
+                  fill:"#FAEEDA",stroke:"#BA7517","stroke-width":"0.7","opacity":"0.8"}));
+                add(e("text",{x:bz.x+bzS/2,y:bz.y+bzS/2+4,fontSize:7.5,fill:"#633806",
+                  "text-anchor":"middle"},"BBQ"));
+              }
 
               ref.appendChild(svg);
             }})

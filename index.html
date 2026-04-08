@@ -22,6 +22,183 @@ textarea{resize:vertical;}
 <body>
 <div id="root"></div>
 <script>
+// ── BUILDXT COMPONENT LIBRARY ─────────────────
+// ============================================================
+// BUILDXT DECK RULES ENGINE v1.0
+// Single source of truth. Jeff calls calcDeck(inputs).
+// All drawing components read ONLY from this output.
+// ============================================================
+
+function calcDeck(inputs) {
+  const {
+    Lm, Dm, FFL,
+    boardDir, deckingType, boardWidthMm,
+    balustradeType,
+    hasStairs, stairFace, stairWidthMm,
+    houseWall,
+  } = inputs;
+
+  const hasBal = balustradeType && balustradeType !== "none";
+
+  // ── RULE: STAIR GEOMETRY (AS1657) ────────────────────────
+  let stair = null;
+  if (hasStairs) {
+    const nRisers  = Math.ceil(FFL / 180);
+    const riser    = Math.round(FFL / nRisers);
+    const going    = 300;
+    const stairRun = nRisers * going;
+    const hyp      = Math.round(Math.sqrt(FFL*FFL + stairRun*stairRun));
+    const angle    = Math.round(Math.atan2(FFL, stairRun) * 180 / Math.PI);
+    const nStr     = 2 + Math.floor((stairWidthMm||1200) / 2000);
+    if (angle < 20 || angle > 45) throw new Error(`Stair angle ${angle}deg out of 20-45 range`);
+    if (riser > 180) throw new Error(`Riser ${riser}mm exceeds AS1657 max 180mm`);
+    stair = {
+      nRisers, riser, going, stairRun, hyp, angle, nStr,
+      strLen: hyp + 300,
+      strTimber: { D:300, W:45 },
+      strPad:    { W:300, D:300, H:60 },
+    };
+  }
+
+  // ── RULE: MEMBER SIZING ───────────────────────────────────
+  const joist   = { D: FFL > 1800 ? 140 : 90, W:45, grade:"H3", spacingMm:450 };
+  const bearer  = { D:140, W:45, grade:"H4", nMembers: hasBal ? 2 : 1,
+                    label: hasBal ? "2/140x45 H4" : "140x45 H4" };
+  const facia   = { D: joist.D, W:19, note:"Same timber as decking" };
+  const decking = { D:19, W: boardWidthMm||90 };
+  const balH    = hasBal ? (FFL >= 1000 ? 1200 : 1000) : 0;
+
+  // ── RULE: PIER HEIGHT ─────────────────────────────────────
+  const pierH = Math.max(50, FFL - bearer.D - joist.D - decking.D);
+
+  // ── RULE: FOOTING GRID ────────────────────────────────────
+  const nBearerRows  = Math.ceil(Dm * 1000 / 1800) + 1;
+  const nPostsPerRow = Math.ceil(Lm * 1000 / 1800) + 1;
+  const nFootings    = nBearerRows * nPostsPerRow;
+  const footing      = { W:400, D:400, H:400, bagsEach:4 };
+
+  // ── RULE: SECTION CUT DIRECTION ──────────────────────────
+  // Section A-A always cuts perpendicular to board direction
+  const sectionCutDir = boardDir === "EW" ? "NS" : "EW";
+
+  // ── QUANTITIES ────────────────────────────────────────────
+  const deckAreaM2  = Lm * Dm;
+  const deckingLM   = Math.ceil((Dm*1000/decking.W) * 1.1) * Lm;
+  const joistLM     = Math.ceil(Dm*1000/joist.spacingMm + 1) * Lm;
+  const bearerLM    = nBearerRows * Lm;
+  const faciaLM     = 2 * (Lm + Dm);
+  const balLM       = hasBal ? faciaLM : 0;
+  const concBags    = nFootings * footing.bagsEach;
+  const stairQty    = stair ? {
+    stringerLM : stair.nStr * stair.strLen / 1000,
+    treadLM    : stair.nRisers * ((stairWidthMm||1200) / 1000),
+    padCount   : stair.nStr,
+  } : null;
+
+  // ── DRAWING PARAMETER SET ─────────────────────────────────
+  // This is ALL the drawing components need. Nothing else.
+  const draw = {
+    Lm, Dm, FFL, boardDir, houseWall,
+    deckWmm: Lm*1000, deckDmm: Dm*1000,
+    hasBal, balH,
+    hasStairs, stairFace,
+    stairWidthMm: stairWidthMm||1200,
+    stair,
+    pierH,
+    joist, bearer, facia, decking, footing,
+    nBearerRows, nPostsPerRow,
+    sectionCutDir,
+  };
+
+  return { inputs, stair, joist, bearer, facia, decking, balH,
+           pierH, nBearerRows, nPostsPerRow, nFootings, footing,
+           deckAreaM2, qty:{ deckingLM, joistLM, bearerLM, faciaLM,
+           balLM, concBags, stairQty }, draw };
+}
+
+// ============================================================
+// BUILDXT DECK DRAWING COMPONENTS v1.0
+// Each component takes draw params from calcDeck().draw
+// and a scale factor SC (px per mm)
+// Components return arrays of SVG element descriptors
+// ============================================================
+
+// ── COMPONENT: STRINGER (validated) ──────────────────────────
+// Solid 300x45 notched stringer with treads on horizontal cuts
+// origin: OX=deck edge x, OY=FFL y, GY=ground y
+function stairComponent(draw, SC, OX, OY, GY) {
+  const { stair, decking } = draw;
+  if (!stair) return [];
+  const { nRisers, riser, going, stairRun } = stair;
+
+  const gW   = going * SC;            // going px
+  const rH   = riser * SC;            // riser px
+  const stW  = stairRun * SC;         // total run px
+  const DKpx = Math.max(3, decking.D * SC); // tread thickness px
+  const strD = Math.max(5, 300 * SC * 0.4); // stringer depth px
+
+  // Bottom face normal vector — perpendicular pointing INTO stringer body
+  const ddx = stW, ddy = GY - OY;
+  const dlen = Math.sqrt(ddx*ddx + ddy*ddy);
+  const fnx = -(ddy/dlen) * strD;    // left
+  const fny =  (ddx/dlen) * strD;    // down
+
+  // Top edge: zig-zag notched profile
+  const top = [[OX, OY]];
+  for (let i = 0; i < nRisers; i++) {
+    top.push([OX + (i+1)*gW, OY + i*rH]);     // horizontal going
+    top.push([OX + (i+1)*gW, OY + (i+1)*rH]); // vertical riser
+  }
+  // Close with bottom face
+  const pts = [...top, [OX+stW+fnx, GY+fny], [OX+fnx, OY+fny]];
+  const poly = pts.map(([px,py]) => `${px.toFixed(1)},${py.toFixed(1)}`).join(' ');
+
+  // Treads on each horizontal notch
+  const treads = Array.from({length: nRisers}, (_, i) => ({
+    x: OX + i*gW, y: OY + i*rH,
+    w: gW, h: DKpx,
+  }));
+
+  // Stringer footing pads — 300x300x60mm at each stringer base
+  const padW = stair.strPad.W * SC;
+  const padH = Math.max(4, stair.strPad.H * SC);
+  const padX = OX + stW - padW/2;
+
+  return { poly, treads, padX, padY:GY, padW, padH, stW, stairRun, nRisers };
+}
+
+// ── COMPONENT: DECK SECTION (validated) ──────────────────────
+// Returns all the y-coordinates and heights for the deck stack
+// so every element lines up correctly
+function deckSectionLayout(draw, SC, FFL_Y) {
+  const { FFL, joist, bearer, decking, facia, hasBal, balH, pierH, footing } = draw;
+
+  const DKpx  = Math.max(3,  decking.D * SC);
+  const JTpx  = Math.max(8,  joist.D   * SC);
+  const BRpx  = Math.max(12, bearer.D  * SC);
+  const PIRpx = pierH * SC;
+  const PADpx = footing.H * SC;
+  const BALpx = hasBal ? Math.max(40, balH * SC) : 0;
+  const FACpx = Math.max(3, facia.W * SC);
+
+  const DK_TOP  = FFL_Y;
+  const JT_TOP  = DK_TOP + DKpx;
+  const BR_TOP  = JT_TOP + JTpx;
+  const BR_BOT  = BR_TOP + BRpx;
+  const PIR_TOP = BR_BOT;
+  const GY      = PIR_TOP + PIRpx;
+  const PAD_BOT = GY + PADpx;
+  const BAL_TOP = hasBal ? FFL_Y - BALpx : FFL_Y;
+
+  return {
+    DKpx, JTpx, BRpx, PIRpx, PADpx, BALpx, FACpx,
+    DK_TOP, JT_TOP, BR_TOP, BR_BOT, PIR_TOP,
+    GY, PAD_BOT, BAL_TOP,
+    FFL_Y,
+  };
+}
+
+// ── END COMPONENTS ────────────────────────────
 const {useState,useMemo,useEffect,useCallback}=React;
 const Y="#F2B705",BG="#F7F7F7",TX="#1A1A1A",BD="#E5E5E5";
 
@@ -560,56 +737,47 @@ function App(){
 
       // ── SCREEN 5: Layout plan ───────────────────────────────────
       screen===5&&React.createElement("div",{className:"fade"},
-        jeff("Your layout plan","Footing grid and board layout — calculated from your inputs."),
+        jeff("Your layout plan","Footing grid and board layout."),
         card((()=>{
-          const Lm=parseFloat(form.length)||5;
-          const Dm=parseFloat(form.width)||4;
-          const FFL=Number(form.heightMm)||300;
-          const boardDir=form.layoutBoard||"EW";
-          const houseWall=form.houseWall||"bottom";
-          const hasStairs=form.stairType!=="none";
-          const stairFace=form.layoutStairs||"S";
-          const stairWidthMm=Number(form.stairWidthMm)||1200;
-          const nRisers=Math.max(2,Math.ceil(FFL/180));
-          const stairRun=nRisers*300;
-          const hasBal=form.balustradeType&&form.balustradeType!=="none";
+          // ── CALL RULES ENGINE ──────────────────────────────
+          const R=calcDeck({
+            Lm:parseFloat(form.length)||5,
+            Dm:parseFloat(form.width)||4,
+            FFL:Number(form.heightMm)||300,
+            boardDir:form.layoutBoard||"EW",
+            deckingType:form.deckingType||"merbau",
+            boardWidthMm:(BOARDS[form.deckingType]||BOARDS.merbau).w,
+            balustradeType:form.balustradeType||"none",
+            hasStairs:form.stairType!=="none",
+            stairFace:form.layoutStairs||"S",
+            stairWidthMm:Number(form.stairWidthMm)||1200,
+            houseWall:form.houseWall||"bottom",
+          });
+          const D=R.draw;
 
-          // 1:20 scale for plan view (wider deck fits better)
-          const SC=1/20;
-          const deckWpx=Lm*1000*SC;
-          const deckDpx=Dm*1000*SC;
-          const stRunPx=stairRun*SC;
-          const stWpx=stairWidthMm*SC;
+          // ── SCALE & CANVAS ─────────────────────────────────
+          const SC=Math.min(0.05, 260/(D.deckWmm), 200/(D.deckDmm));
+          const deckWpx=D.deckWmm*SC, deckDpx=D.deckDmm*SC;
+          const stRunPx=D.hasStairs?D.stair.stairRun*SC:0;
+          const stWpx=Math.min((D.stairWidthMm||1200)*SC, deckWpx*0.7);
+          const ML=80,MR=80,MT=60,MB=90;
+          const CVS_W=Math.round(deckWpx+ML+MR);
+          const CVS_H=Math.round(deckDpx+MT+MB+(D.hasStairs&&(D.stairFace==="S"||D.stairFace==="N")?stRunPx+20:0));
+          const OX=ML, OY=MT;
 
-          // Canvas
-          const ML=60,MR=60,MT=50,MB=60;
-          const CVS_W=Math.max(400,deckWpx+ML+MR+80);
-          const CVS_H=Math.max(320,deckDpx+MT+MB+110);
-          const OX=ML,OY=MT;
+          // Bearer row Y positions (across D)
+          const bRowYs=Array.from({length:R.nBearerRows},(_,i)=>OY+(i/Math.max(1,R.nBearerRows-1))*deckDpx);
+          // Post col X positions (along L)
+          const bColXs=Array.from({length:R.nPostsPerRow},(_,i)=>OX+(i/Math.max(1,R.nPostsPerRow-1))*deckWpx);
 
-          // Footing grid
-          const nBRows=Math.ceil(Dm*1000/1800)+1;
-          const nBCols=Math.ceil(Lm*1000/1800)+1;
-
-          // Bearer rows (across D direction)
-          const bRowYs=Array.from({length:nBRows},(_,i)=>OY+(i/Math.max(1,nBRows-1))*deckDpx);
-          // Post cols (along L direction)
-          const bColXs=Array.from({length:nBCols},(_,i)=>OX+(i/Math.max(1,nBCols-1))*deckWpx);
-
-          // Section A-A cut line — perpendicular to boards
-          // If EW boards → joists NS → cut E-W (horizontal on plan)
-          // If NS boards → joists EW → cut N-S (vertical on plan)
-          const sectionY=OY+deckDpx/2;
-          const sectionX=OX+deckWpx/2;
-
-          // Stair rectangle on plan
-          const stairRects={
+          // Stair rectangle
+          const srs={
             N:{x:OX+(deckWpx-stWpx)/2,y:OY-stRunPx,w:stWpx,h:stRunPx},
             S:{x:OX+(deckWpx-stWpx)/2,y:OY+deckDpx,w:stWpx,h:stRunPx},
             E:{x:OX+deckWpx,y:OY+(deckDpx-stWpx)/2,w:stRunPx,h:stWpx},
             W:{x:OX-stRunPx,y:OY+(deckDpx-stWpx)/2,w:stRunPx,h:stWpx},
           };
-          const sr=hasStairs?stairRects[stairFace]||stairRects.S:null;
+          const sr=D.hasStairs?(srs[D.stairFace]||srs.S):null;
 
           const ns="http://www.w3.org/2000/svg";
           const e=(tag,attrs,txt)=>{
@@ -631,139 +799,119 @@ function App(){
               const add=el=>svg.appendChild(el);
 
               // Title
-              const t=e("text",{x:OX,y:MT-28,fontSize:8,fill:"#aaa"},
-                `Plan view · ${Lm}m × ${Dm}m · FFL ${FFL}mm · ${boardDir} boards · Scale 1:20`);
-              add(t);
+              add(e("text",{x:OX,y:20,fontSize:7.5,fill:"#bbb"},
+                `Plan view · ${D.Lm}m × ${D.Dm}m · FFL ${D.FFL}mm · ${D.boardDir} boards · Scale 1:${Math.round(1/SC)}`));
 
-              // House wall indicator
-              const houseLabels={top:"House (North)",bottom:"House (South)",left:"House (West)",right:"House (East)"};
-              const housePositions={
-                top:{x:OX+deckWpx/2,y:OY-18,anchor:"middle"},
-                bottom:{x:OX+deckWpx/2,y:OY+deckDpx+28,anchor:"middle"},
-                left:{x:OX-24,y:OY+deckDpx/2,anchor:"middle"},
-                right:{x:OX+deckWpx+24,y:OY+deckDpx/2,anchor:"middle"},
-              };
-              const hp=housePositions[houseWall];
-              const ht=e("text",{x:hp.x,y:hp.y,fontSize:8,fill:"#888","text-anchor":hp.anchor},
-                houseLabels[houseWall]||"House");
-              add(ht);
+              // House wall label — above/below/left/right of deck
+              const hwPos={top:[OX+deckWpx/2,OY-28,"middle"],bottom:[OX+deckWpx/2,OY+deckDpx+22,"middle"],
+                           left:[OX-12,OY+deckDpx/2,"end"],right:[OX+deckWpx+12,OY+deckDpx/2,"start"]};
+              const hw=hwPos[D.houseWall]||hwPos.bottom;
+              add(e("text",{x:hw[0],y:hw[1],fontSize:8,fill:"#aaa","text-anchor":hw[2]},"House"));
+
               // House wall thick line
-              const hwLines={
-                top:[OX,OY,OX+deckWpx,OY],
-                bottom:[OX,OY+deckDpx,OX+deckWpx,OY+deckDpx],
-                left:[OX,OY,OX,OY+deckDpx],
-                right:[OX+deckWpx,OY,OX+deckWpx,OY+deckDpx],
-              };
-              const hl=hwLines[houseWall]||hwLines.bottom;
-              add(e("line",{x1:hl[0],y1:hl[1],x2:hl[2],y2:hl[3],stroke:"#1a1a1a","stroke-width":"3"}));
+              const hwLine={top:[OX,OY,OX+deckWpx,OY],bottom:[OX,OY+deckDpx,OX+deckWpx,OY+deckDpx],
+                            left:[OX,OY,OX,OY+deckDpx],right:[OX+deckWpx,OY,OX+deckWpx,OY+deckDpx]};
+              const hl=hwLine[D.houseWall]||hwLine.bottom;
+              add(e("line",{x1:hl[0],y1:hl[1],x2:hl[2],y2:hl[3],stroke:"#1a1a1a","stroke-width":"3.5"}));
+
+              // Stair rectangle — drawn before deck outline
+              if(sr){
+                add(e("rect",{x:sr.x,y:sr.y,width:sr.w,height:sr.h,
+                  fill:"#F5F0E8",stroke:"#1a1a1a","stroke-width":"0.8","stroke-dasharray":"4,3"}));
+                const isNS=D.stairFace==="N"||D.stairFace==="S";
+                for(let i=1;i<D.stair.nRisers;i++){
+                  const f=i/D.stair.nRisers;
+                  if(isNS){
+                    const ty=D.stairFace==="S"?sr.y+f*sr.h:sr.y+(1-f)*sr.h;
+                    add(e("line",{x1:sr.x,y1:ty,x2:sr.x+sr.w,y2:ty,stroke:"#ccc","stroke-width":"0.5"}));
+                  } else {
+                    const tx=D.stairFace==="E"?sr.x+f*sr.w:sr.x+(1-f)*sr.w;
+                    add(e("line",{x1:tx,y1:sr.y,x2:tx,y2:sr.y+sr.h,stroke:"#ccc","stroke-width":"0.5"}));
+                  }
+                }
+                add(e("text",{x:sr.x+sr.w/2,y:sr.y+sr.h/2+4,fontSize:8,fill:"#aaa",
+                  "text-anchor":"middle","font-style":"italic"},"dn"));
+              }
 
               // Deck outline
               add(e("rect",{x:OX,y:OY,width:deckWpx,height:deckDpx,
                 fill:"#FAFAF8",stroke:"#1a1a1a","stroke-width":"1.2"}));
 
               // Board lines (light)
-              if(boardDir==="EW"||boardDir==="NS"){
-                const isEW=boardDir==="EW";
-                const count=isEW?Math.ceil(Dm*1000/100):Math.ceil(Lm*1000/100);
-                for(let i=1;i<count;i++){
-                  const p=i/count;
-                  const x1=isEW?OX:OX+p*deckWpx;
-                  const y1=isEW?OY+p*deckDpx:OY;
-                  const x2=isEW?OX+deckWpx:OX+p*deckWpx;
-                  const y2=isEW?OY+p*deckDpx:OY+deckDpx;
-                  add(e("line",{x1,y1,x2,y2,stroke:"#ccc","stroke-width":"0.4"}));
-                }
+              const isEW=D.boardDir==="EW";
+              const bSpacePx=(isEW?D.Dm*1000:D.Lm*1000)*SC/Math.ceil((isEW?D.Dm*1000:D.Lm*1000)/150);
+              const bCount=Math.ceil((isEW?deckDpx:deckWpx)/bSpacePx);
+              for(let i=1;i<bCount;i++){
+                const f=i*bSpacePx;
+                add(e("line",{
+                  x1:isEW?OX:OX+f, y1:isEW?OY+f:OY,
+                  x2:isEW?OX+deckWpx:OX+f, y2:isEW?OY+f:OY+deckDpx,
+                  stroke:"#ddd","stroke-width":"0.4"}));
               }
 
-              // Bearer lines (dashed, perpendicular to boards)
+              // Bearer lines — solid thin lines perpendicular to boards
               bRowYs.forEach(by=>{
                 add(e("line",{x1:OX,y1:by,x2:OX+deckWpx,y2:by,
-                  stroke:"#888","stroke-width":"0.5","stroke-dasharray":"4,2"}));
+                  stroke:"#999","stroke-width":"0.6"}));
               });
 
               // Footing dots
               bRowYs.forEach(by=>{
                 bColXs.forEach(bx=>{
-                  add(e("circle",{cx:bx,cy:by,r:4,fill:"#333",stroke:"#1a1a1a","stroke-width":"0.5"}));
+                  add(e("circle",{cx:bx,cy:by,r:4,fill:"#1a1a1a",stroke:"white","stroke-width":"1"}));
                 });
               });
 
-              // Stair rectangle on plan
-              if(sr){
-                add(e("rect",{x:sr.x,y:sr.y,width:sr.w,height:sr.h,
-                  fill:"#F5F0E8",stroke:"#1a1a1a","stroke-width":"0.8","stroke-dasharray":"3,2"}));
-                // Tread lines — full width, evenly spaced across stair run
-                // Lines run perpendicular to stair direction
-                const isNS=stairFace==="N"||stairFace==="S";
-                for(let i=1;i<nRisers;i++){
-                  const f=i/nRisers;
-                  if(isNS){
-                    // Treads horizontal — lines run E-W across stair width
-                    const ty=stairFace==="S"?sr.y+f*sr.h:sr.y+(1-f)*sr.h;
-                    add(e("line",{x1:sr.x,y1:ty,x2:sr.x+sr.w,y2:ty,
-                      stroke:"#999","stroke-width":"0.6"}));
-                  } else {
-                    // Treads vertical — lines run N-S across stair width
-                    const tx=stairFace==="E"?sr.x+f*sr.w:sr.x+(1-f)*sr.w;
-                    add(e("line",{x1:tx,y1:sr.y,x2:tx,y2:sr.y+sr.h,
-                      stroke:"#999","stroke-width":"0.6"}));
-                  }
-                }
-                // Down arrow showing direction
-                const ax=sr.x+sr.w/2, ay=sr.y+sr.h/2;
-                add(e("text",{x:ax,y:ay+4,fontSize:9,fill:"#888","text-anchor":"middle","font-style":"italic"},"dn"));
-              }
-
-              // Section A-A cut line — long dash dot pattern
-              const isEWcut=boardDir==="EW";
-              if(isEWcut){
-                add(e("line",{x1:OX-30,y1:sectionY,x2:OX+deckWpx+30,y2:sectionY,
-                  stroke:"#333","stroke-width":"0.7","stroke-dasharray":"10,4,2,4"}));
-                [[OX-30,sectionY],[OX+deckWpx+30,sectionY]].forEach(([cx,cy])=>{
-                  add(e("circle",{cx,cy,r:9,fill:"white",stroke:"#333","stroke-width":"1"}));
-                  add(e("text",{x:cx,y:cy+4,fontSize:9,fill:"#333","text-anchor":"middle","font-weight":"600"},"A"));
+              // Section A-A cut line
+              if(D.sectionCutDir==="NS"){
+                // Vertical cut
+                const cx=OX+deckWpx/2;
+                add(e("line",{x1:cx,y1:OY-22,x2:cx,y2:OY+deckDpx+22,
+                  stroke:"#333","stroke-width":"0.7","stroke-dasharray":"10,3,2,3"}));
+                [[cx,OY-22],[cx,OY+deckDpx+22]].forEach(([x,y])=>{
+                  add(e("circle",{cx:x,cy:y,r:9,fill:"white",stroke:"#333","stroke-width":"1"}));
+                  add(e("text",{x,y:y+4,fontSize:9,fill:"#333","text-anchor":"middle","font-weight":"600"},"A"));
                 });
               } else {
-                add(e("line",{x1:sectionX,y1:OY-30,x2:sectionX,y2:OY+deckDpx+30,
-                  stroke:"#333","stroke-width":"0.7","stroke-dasharray":"10,4,2,4"}));
-                [[sectionX,OY-30],[sectionX,OY+deckDpx+30]].forEach(([cx,cy])=>{
-                  add(e("circle",{cx,cy,r:9,fill:"white",stroke:"#333","stroke-width":"1"}));
-                  add(e("text",{x:cx,y:cy+4,fontSize:9,fill:"#333","text-anchor":"middle","font-weight":"600"},"A"));
+                // Horizontal cut
+                const cy=OY+deckDpx/2;
+                add(e("line",{x1:OX-22,y1:cy,x2:OX+deckWpx+22,y2:cy,
+                  stroke:"#333","stroke-width":"0.7","stroke-dasharray":"10,3,2,3"}));
+                [[OX-22,cy],[OX+deckWpx+22,cy]].forEach(([x,y])=>{
+                  add(e("circle",{cx:x,cy:y,r:9,fill:"white",stroke:"#333","stroke-width":"1"}));
+                  add(e("text",{x,y:y+4,fontSize:9,fill:"#333","text-anchor":"middle","font-weight":"600"},"A"));
                 });
               }
 
-              // North arrow
-              const nx=OX+deckWpx+42,ny=OY+20;
-              add(e("line",{x1:nx,y1:ny+16,x2:nx,y2:ny-2,stroke:"#1a1a1a","stroke-width":"1"}));
-              add(e("polygon",{points:`${nx},${ny-2} ${nx-5},${ny+10} ${nx+5},${ny+10}`,fill:"#1a1a1a"}));
-              add(e("text",{x:nx,y:ny+28,fontSize:9,fill:"#1a1a1a","text-anchor":"middle","font-weight":"600"},"N"));
+              // North arrow — top right
+              const nx=OX+deckWpx+42, ny=OY+20;
+              add(e("line",{x1:nx,y1:ny+18,x2:nx,y2:ny,stroke:"#1a1a1a","stroke-width":"1.2"}));
+              add(e("polygon",{points:`${nx-5},${ny+10} ${nx+5},${ny+10} ${nx},${ny}`,fill:"#1a1a1a"}));
+              add(e("text",{x:nx,y:ny+32,fontSize:10,fill:"#1a1a1a","text-anchor":"middle","font-weight":"700"},"N"));
 
-              // Dimensions outside
-              // Bottom: deck length
-              const dimY=OY+deckDpx+30;
-              add(e("line",{x1:OX,y1:dimY,x2:OX+deckWpx,y2:dimY,stroke:"#555","stroke-width":"0.6"}));
-              add(e("line",{x1:OX,y1:dimY-3,x2:OX,y2:dimY+3,stroke:"#555","stroke-width":"0.6"}));
-              add(e("line",{x1:OX+deckWpx,y1:dimY-3,x2:OX+deckWpx,y2:dimY+3,stroke:"#555","stroke-width":"0.6"}));
-              add(e("text",{x:OX+deckWpx/2,y:dimY+13,fontSize:9,fill:"#333","text-anchor":"middle"},`${Math.round(Lm*1000)}mm`));
+              // Dimension — deck length (below, clear of stair)
+              const dimYbase=OY+deckDpx+(D.hasStairs&&(D.stairFace==="S")?(stRunPx+16):16);
+              add(e("line",{x1:OX,y1:dimYbase,x2:OX+deckWpx,y2:dimYbase,stroke:"#555","stroke-width":"0.6"}));
+              add(e("line",{x1:OX,y1:dimYbase-3,x2:OX,y2:dimYbase+3,stroke:"#555","stroke-width":"0.6"}));
+              add(e("line",{x1:OX+deckWpx,y1:dimYbase-3,x2:OX+deckWpx,y2:dimYbase+3,stroke:"#555","stroke-width":"0.6"}));
+              add(e("text",{x:OX+deckWpx/2,y:dimYbase+13,fontSize:9,fill:"#333","text-anchor":"middle"},`${Math.round(D.deckWmm)}mm`));
 
-              // Right: deck depth
-              const dimX2=OX+deckWpx+30;
-              add(e("line",{x1:dimX2,y1:OY,x2:dimX2,y2:OY+deckDpx,stroke:"#555","stroke-width":"0.6"}));
-              add(e("line",{x1:dimX2-3,y1:OY,x2:dimX2+3,y2:OY,stroke:"#555","stroke-width":"0.6"}));
-              add(e("line",{x1:dimX2-3,y1:OY+deckDpx,x2:dimX2+3,y2:OY+deckDpx,stroke:"#555","stroke-width":"0.6"}));
-              add(e("text",{x:dimX2+14,y:OY+deckDpx/2+3,fontSize:9,fill:"#333",
-                "text-anchor":"middle",transform:`rotate(-90,${dimX2+14},${OY+deckDpx/2})`},`${Math.round(Dm*1000)}mm`));
+              // Dimension — deck depth (right side)
+              const dimXR=OX+deckWpx+28;
+              add(e("line",{x1:dimXR,y1:OY,x2:dimXR,y2:OY+deckDpx,stroke:"#555","stroke-width":"0.6"}));
+              add(e("line",{x1:dimXR-3,y1:OY,x2:dimXR+3,y2:OY,stroke:"#555","stroke-width":"0.6"}));
+              add(e("line",{x1:dimXR-3,y1:OY+deckDpx,x2:dimXR+3,y2:OY+deckDpx,stroke:"#555","stroke-width":"0.6"}));
+              add(e("text",{x:dimXR+14,y:OY+deckDpx/2+3,fontSize:9,fill:"#333",
+                "text-anchor":"middle",transform:`rotate(-90,${dimXR+14},${OY+deckDpx/2})`},`${Math.round(D.deckDmm)}mm`));
 
-              // Scale bar — below dims
-              const sbx=OX,sby=OY+deckDpx+68;
-              add(e("line",{x1:sbx,y1:sby,x2:sbx+100,y2:sby,stroke:"#333","stroke-width":"1"}));
-              add(e("line",{x1:sbx,y1:sby-4,x2:sbx,y2:sby+4,stroke:"#333","stroke-width":"1"}));
-              add(e("line",{x1:sbx+100,y1:sby-4,x2:sbx+100,y2:sby+4,stroke:"#333","stroke-width":"1"}));
-              add(e("rect",{x:sbx,y:sby-4,width:50,height:4,fill:"#333"}));
-              add(e("text",{x:sbx,y:sby+12,fontSize:7.5,fill:"#333"},"0"));
-              add(e("text",{x:sbx+50,y:sby+12,fontSize:7.5,fill:"#333","text-anchor":"middle"},"1000mm"));
-              add(e("text",{x:sbx+100,y:sby+12,fontSize:7.5,fill:"#333","text-anchor":"middle"},"2000mm"));
-              add(e("text",{x:sbx+110,y:sby+12,fontSize:7.5,fill:"#999"},"Scale 1:20"));
+              // Scale bar — bottom left, clear of everything
+              const sbY=CVS_H-18;
+              add(e("rect",{x:OX,y:sbY-5,width:50,height:5,fill:"#333"}));
+              add(e("rect",{x:OX+50,y:sbY-5,width:50,height:5,fill:"white",stroke:"#333","stroke-width":"0.8"}));
+              add(e("text",{x:OX,y:sbY+10,fontSize:7.5,fill:"#333"},"0"));
+              add(e("text",{x:OX+50,y:sbY+10,fontSize:7.5,fill:"#333","text-anchor":"middle"},`${Math.round(1000*SC*50)}mm`));
+              add(e("text",{x:OX+100,y:sbY+10,fontSize:7.5,fill:"#333","text-anchor":"middle"},`${Math.round(1000*SC*100)}mm`));
+              add(e("text",{x:OX+104,y:sbY+10,fontSize:7.5,fill:"#999"},`Scale 1:${Math.round(1/SC)}`));
 
               ref.appendChild(svg);
             }})
@@ -777,93 +925,47 @@ function App(){
       screen===6&&React.createElement("div",{className:"fade"},
         jeff("Section A-A","Calculated from your inputs — 1:10 scale."),
         card((()=>{
-          const Lm=parseFloat(form.length)||5;
-          const Dm=parseFloat(form.width)||4;
-          const FFL=Number(form.heightMm)||300;
-          const hasBal=form.balustradeType&&form.balustradeType!=="none";
-          const boardDir=form.layoutBoard||"EW";
-          const hasStairs=form.stairType!=="none";
+          // ── CALL RULES ENGINE ──────────────────────────────
+          const R=calcDeck({
+            Lm:parseFloat(form.length)||5,
+            Dm:parseFloat(form.width)||4,
+            FFL:Number(form.heightMm)||300,
+            boardDir:form.layoutBoard||"EW",
+            deckingType:form.deckingType||"merbau",
+            boardWidthMm:(BOARDS[form.deckingType]||BOARDS.merbau).w,
+            balustradeType:form.balustradeType||"none",
+            hasStairs:form.stairType!=="none",
+            stairFace:form.layoutStairs||"S",
+            stairWidthMm:Number(form.stairWidthMm)||1200,
+            houseWall:form.houseWall||"bottom",
+          });
+          const D=R.draw;
+          const SC=0.1; // 1:10 scale
 
-          // ── STAIR RULES (validated) ──────────────────────────
-          const nRisers=Math.max(2,Math.ceil(FFL/180));
-          const riser=Math.round(FFL/nRisers);
-          const going=300;
-          const stairRun=nRisers*going;
-          const stairAngle=Math.round(Math.atan2(FFL,stairRun)*180/Math.PI);
-
-          // ── MEMBER SIZES ─────────────────────────────────────
-          const DK_H=19,JT_H=FFL>1800?140:90,BR_H=140,PIR_W=100;
-          const PAD_H=400,PAD_W=400,FAC_T=19;
-          const BAL_H=hasBal?(FFL>=1000?1200:1000):0;
-          const PIR_H=Math.max(50,FFL-BR_H-JT_H-DK_H);
-
-          // ── 1:10 SCALE ───────────────────────────────────────
-          const SC=1/10;
-          const s=v=>v*SC;
-
-          // Minimum pixel sizes for legibility
-          const DK_PX=Math.max(3,s(DK_H));
-          const JT_PX=Math.max(8,s(JT_H));
-          const BR_PX=Math.max(12,s(BR_H));
-          const PIR_PX=s(PIR_H);
-          const PAD_PX=s(PAD_H);
-          const BAL_PX=hasBal?s(BAL_H):0;
-          const STR_PAD_H=Math.max(5,s(60)); // 60mm stringer pad
-
-          // Canvas
-          const ML=160,MR=220,MT=hasBal?BAL_PX+30:30,MB=70;
-          const deckWpx=s(Dm*1000);
-          const stRunPx=hasStairs?s(stairRun):0;
+          // ── SECTION LAYOUT from component ──────────────────
+          const BALpx=D.hasBal?Math.max(40,D.balH*SC):0;
+          const ML=170,MR=200,MT=D.hasBal?BALpx+30:30,MB=70;
+          const deckWpx=D.deckWmm*SC;
+          const stRunPx=D.hasStairs?D.stair.stairRun*SC:0;
           const CVS_W=ML+deckWpx+stRunPx+MR;
-
-          // Y coords
           const FFL_Y=MT;
-          const DK_TOP=FFL_Y;
-          const JT_TOP=DK_TOP+DK_PX;
-          const BR_TOP=JT_TOP+JT_PX;
-          const BR_BOT=BR_TOP+BR_PX;
-          const PIR_TOP=BR_BOT;
-          const GY=PIR_TOP+PIR_PX;
-          const PAD_BOT=GY+PAD_PX;
-          const BAL_TOP=hasBal?FFL_Y-BAL_PX:FFL_Y;
-          const CVS_H=Math.round(PAD_BOT+MB);
+          const L=deckSectionLayout(D,SC,FFL_Y);
+          const CVS_H=Math.round(L.PAD_BOT+MB);
           const OX=ML;
 
-          // Pier positions
-          const nBRows=Math.ceil(Dm*1000/1800)+1;
+          // Pier X positions
+          const nBRows=R.nBearerRows;
           const pierXs=Array.from({length:nBRows},(_,i)=>OX+(i/Math.max(1,nBRows-1))*deckWpx);
 
-          // ── STRINGER GEOMETRY (validated component) ───────────
-          const x0=OX+deckWpx;
-          const y0=FFL_Y;
-          const gW=s(going);
-          const rH=(GY-FFL_Y)/nRisers;
-          const stW=stRunPx;
-          const strD=Math.max(5,s(300)*0.4);
-          // Bottom face normal: for stringer going right+down
-          // perpendicular pointing into stringer body = rotate direction 90° CCW
-          const ddx=stW,ddy=GY-FFL_Y;
-          const dlen=Math.sqrt(ddx*ddx+ddy*ddy);
-          const fnx=-(ddy/dlen)*strD;
-          const fny= (ddx/dlen)*strD;
-
-          const buildStringer=()=>{
-            const top=[[x0,y0]];
-            for(let i=0;i<nRisers;i++){
-              top.push([x0+(i+1)*gW, y0+i*rH]);
-              top.push([x0+(i+1)*gW, y0+(i+1)*rH]);
-            }
-            top.push([x0+stW+fnx, GY+fny]);
-            top.push([x0+fnx, y0+fny]);
-            return top.map(([px,py])=>`${px.toFixed(1)},${py.toFixed(1)}`).join(" ");
-          };
+          // Stringer from component
+          const stair=D.hasStairs?stairComponent(D,SC,OX+deckWpx,FFL_Y,L.GY):null;
 
           const ns="http://www.w3.org/2000/svg";
-          const el=(tag,attrs,txt)=>{
-            const e=document.createElementNS(ns,tag);
-            Object.entries(attrs).forEach(([k,v])=>e.setAttribute(k,String(v)));
-            if(txt!==undefined)e.textContent=txt;
-            return e;
+          const e=(tag,attrs,txt)=>{
+            const el=document.createElementNS(ns,tag);
+            Object.entries(attrs).forEach(([k,v])=>el.setAttribute(k,String(v)));
+            if(txt!==undefined)el.textContent=txt;
+            return el;
           };
 
           return React.createElement("div",null,
@@ -878,149 +980,134 @@ function App(){
               const add=el=>svg.appendChild(el);
 
               // Title
-              add(el("text",{x:OX,y:MT-12,fontSize:8,fill:"#aaa"},
-                `Section A-A · ${Dm}m × ${Lm}m · FFL ${FFL}mm · ${boardDir} boards · Scale 1:10`));
+              add(e("text",{x:OX,y:MT-12,fontSize:7.5,fill:"#bbb"},
+                `Section A-A · ${D.Dm}m × ${D.Lm}m · FFL ${D.FFL}mm · ${D.boardDir} boards · Scale 1:10`));
 
-              // Soil
-              add(el("rect",{x:OX-10,y:GY,width:deckWpx+stRunPx+20,height:PAD_PX+10,fill:"#F0ECE4"}));
-              for(let i=0;i<14;i++){
-                add(el("line",{x1:OX-10+i*22,y1:GY,x2:OX-10+i*22-11,y2:GY+PAD_PX+10,stroke:"#bbb","stroke-width":"0.35"}));
-              }
+              // Soil hatch
+              add(e("rect",{x:OX-10,y:L.GY,width:deckWpx+stRunPx+20,height:L.PADpx+10,fill:"#F0ECE4"}));
+              for(let i=0;i<14;i++) add(e("line",{x1:OX-10+i*22,y1:L.GY,x2:OX-10+i*22-11,y2:L.GY+L.PADpx+10,stroke:"#bbb","stroke-width":"0.35"}));
 
               // GL
-              add(el("line",{x1:OX-80,y1:GY,x2:OX+deckWpx+stRunPx+20,y2:GY,stroke:"#1a1a1a","stroke-width":"1.2"}));
-              add(el("text",{x:OX-82,y:GY+4,fontSize:9,fill:"#1a1a1a","font-weight":"bold","text-anchor":"end"},"GL"));
+              add(e("line",{x1:OX-ML+10,y1:L.GY,x2:OX+deckWpx+stRunPx+20,y2:L.GY,stroke:"#1a1a1a","stroke-width":"1.2"}));
+              add(e("text",{x:OX-ML+6,y:L.GY+4,fontSize:9,fill:"#1a1a1a","font-weight":"bold"},"GL"));
 
               // FFL
-              add(el("line",{x1:OX-80,y1:FFL_Y,x2:OX+deckWpx+stRunPx+10,y2:FFL_Y,stroke:"#1a1a1a","stroke-width":"0.6","stroke-dasharray":"5,3"}));
-              add(el("text",{x:OX-82,y:FFL_Y+4,fontSize:9,fill:"#1a1a1a","font-weight":"bold","text-anchor":"end"},"FFL"));
+              add(e("line",{x1:OX-ML+10,y1:FFL_Y,x2:OX+deckWpx+stRunPx+10,y2:FFL_Y,stroke:"#1a1a1a","stroke-width":"0.6","stroke-dasharray":"5,3"}));
+              add(e("text",{x:OX-ML+6,y:FFL_Y+4,fontSize:9,fill:"#1a1a1a","font-weight":"bold"},"FFL"));
 
-              // Footings — T-shape, flush at GL
-              pierXs.forEach((px,i)=>{
-                // Pad
-                add(el("rect",{x:px-s(PAD_W)/2,y:GY,width:s(PAD_W),height:PAD_PX,fill:"#E8E8E8",stroke:"#1a1a1a","stroke-width":"0.8"}));
-                // Concrete hatch
-                for(let h=1;h<=3;h++) add(el("line",{x1:px-s(PAD_W)/2,y1:GY+h*PAD_PX/4,x2:px+s(PAD_W)/2,y2:GY+h*PAD_PX/4,stroke:"#aaa","stroke-width":"0.35"}));
-                // Pier stem above ground
-                add(el("rect",{x:px-Math.max(5,s(PIR_W)/2),y:PIR_TOP,width:Math.max(10,s(PIR_W)),height:PIR_PX,fill:"#E8E8E8",stroke:"#1a1a1a","stroke-width":"0.8"}));
-                // Stirrup cap
-                add(el("rect",{x:px-Math.max(5,s(PIR_W)/2)-3,y:PIR_TOP-3,width:Math.max(10,s(PIR_W))+6,height:3,fill:"#555",stroke:"none"}));
+              // Footings — T shape, flush at GL
+              pierXs.forEach(px=>{
+                add(e("rect",{x:px-D.footing.W*SC/2,y:L.GY,width:D.footing.W*SC,height:L.PADpx,fill:"#E8E8E8",stroke:"#1a1a1a","stroke-width":"0.8"}));
+                for(let h=1;h<=3;h++) add(e("line",{x1:px-D.footing.W*SC/2,y1:L.GY+h*L.PADpx/4,x2:px+D.footing.W*SC/2,y2:L.GY+h*L.PADpx/4,stroke:"#aaa","stroke-width":"0.35"}));
+                // Pier
+                const pw=Math.max(10,D.bearer.W*SC);
+                add(e("rect",{x:px-pw/2,y:L.PIR_TOP,width:pw,height:L.PIRpx,fill:"#E8E8E8",stroke:"#1a1a1a","stroke-width":"0.8"}));
+                add(e("rect",{x:px-pw/2-3,y:L.PIR_TOP-3,width:pw+6,height:3,fill:"#555",stroke:"none"}));
               });
 
               // Bearer
-              add(el("rect",{x:OX,y:BR_TOP,width:deckWpx,height:BR_PX,fill:"#F5F0E8",stroke:"#1a1a1a","stroke-width":"1"}));
-              add(el("text",{x:OX+deckWpx/2,y:BR_TOP+BR_PX/2+3,fontSize:8,fill:"#1a1a1a","text-anchor":"middle","font-weight":"500"},hasBal?"2/140×45 H4":"140×45 H4"));
+              add(e("rect",{x:OX,y:L.BR_TOP,width:deckWpx,height:L.BRpx,fill:"#F5F0E8",stroke:"#1a1a1a","stroke-width":"1"}));
+              add(e("text",{x:OX+deckWpx/2,y:L.BR_TOP+L.BRpx/2+3,fontSize:8,fill:"#1a1a1a","text-anchor":"middle","font-weight":"500"},D.bearer.label));
 
               // Joists
-              const nJoists=Math.min(12,Math.ceil(Dm*1000/450)+1);
-              for(let i=0;i<nJoists;i++){
-                const jx=OX+(i/Math.max(1,nJoists-1))*deckWpx;
-                const jw=Math.max(6,Math.min(12,s(JT_H)));
-                add(el("rect",{x:jx-jw/2,y:JT_TOP,width:jw,height:JT_PX,fill:"#F5F0E8",stroke:"#1a1a1a","stroke-width":"0.7"}));
+              const nJ=Math.min(12,Math.ceil(D.deckWmm/D.joist.spacingMm)+1);
+              for(let i=0;i<nJ;i++){
+                const jx=OX+(i/Math.max(1,nJ-1))*deckWpx;
+                const jw=Math.max(6,Math.min(12,D.bearer.W*SC));
+                add(e("rect",{x:jx-jw/2,y:L.JT_TOP,width:jw,height:L.JTpx,fill:"#F5F0E8",stroke:"#1a1a1a","stroke-width":"0.7"}));
               }
 
               // Decking
-              add(el("rect",{x:OX,y:DK_TOP,width:deckWpx,height:DK_PX,fill:"#F5F0E8",stroke:"#1a1a1a","stroke-width":"0.8"}));
-              const nBoards=Math.min(24,Math.ceil(Dm*1000/100));
-              for(let i=1;i<nBoards;i++){
-                add(el("line",{x1:OX+i*(deckWpx/nBoards),y1:DK_TOP,x2:OX+i*(deckWpx/nBoards),y2:DK_TOP+DK_PX,stroke:"#aaa","stroke-width":"0.4"}));
-              }
+              add(e("rect",{x:OX,y:L.DK_TOP,width:deckWpx,height:L.DKpx,fill:"#F5F0E8",stroke:"#1a1a1a","stroke-width":"0.8"}));
+              const nB=Math.min(20,Math.ceil(D.deckWmm/120));
+              for(let i=1;i<nB;i++) add(e("line",{x1:OX+i*(deckWpx/nB),y1:L.DK_TOP,x2:OX+i*(deckWpx/nB),y2:L.DK_TOP+L.DKpx,stroke:"#ccc","stroke-width":"0.4"}));
 
               // Facia
-              add(el("rect",{x:OX-Math.max(3,s(FAC_T)),y:JT_TOP,width:Math.max(3,s(FAC_T)),height:JT_PX+DK_PX,fill:"#F5F0E8",stroke:"#1a1a1a","stroke-width":"0.8"}));
-              add(el("rect",{x:OX+deckWpx,y:JT_TOP,width:Math.max(3,s(FAC_T)),height:JT_PX+DK_PX,fill:"#F5F0E8",stroke:"#1a1a1a","stroke-width":"0.8"}));
+              const fW=Math.max(3,D.facia.W*SC);
+              add(e("rect",{x:OX-fW,y:L.JT_TOP,width:fW,height:L.JTpx+L.DKpx,fill:"#F5F0E8",stroke:"#1a1a1a","stroke-width":"0.8"}));
+              add(e("rect",{x:OX+deckWpx,y:L.JT_TOP,width:fW,height:L.JTpx+L.DKpx,fill:"#F5F0E8",stroke:"#1a1a1a","stroke-width":"0.8"}));
 
               // Balustrade
-              if(hasBal){
-                add(el("rect",{x:OX-5,y:BAL_TOP,width:10,height:BAL_PX,fill:"#F5F0E8",stroke:"#1a1a1a","stroke-width":"0.8"}));
-                add(el("rect",{x:OX+deckWpx-5,y:BAL_TOP,width:10,height:BAL_PX,fill:"#F5F0E8",stroke:"#1a1a1a","stroke-width":"0.8"}));
-                add(el("rect",{x:OX-7,y:BAL_TOP,width:deckWpx+14,height:5,fill:"#F5F0E8",stroke:"#1a1a1a","stroke-width":"0.8"}));
-                for(let i=0;i<7;i++){
-                  add(el("line",{x1:OX,y1:BAL_TOP+BAL_PX*(i+1)/8,x2:OX+deckWpx,y2:BAL_TOP+BAL_PX*(i+1)/8,stroke:"#888","stroke-width":"0.5"}));
-                }
+              if(D.hasBal){
+                const BT=L.BAL_TOP, BH=L.BALpx, pw2=8;
+                add(e("rect",{x:OX-pw2/2,y:BT,width:pw2,height:BH,fill:"#F5F0E8",stroke:"#1a1a1a","stroke-width":"0.8"}));
+                add(e("rect",{x:OX+deckWpx-pw2/2,y:BT,width:pw2,height:BH,fill:"#F5F0E8",stroke:"#1a1a1a","stroke-width":"0.8"}));
+                add(e("rect",{x:OX-8,y:BT,width:deckWpx+16,height:5,fill:"#F5F0E8",stroke:"#1a1a1a","stroke-width":"0.8"}));
+                for(let i=1;i<=6;i++) add(e("line",{x1:OX,y1:BT+BH*i/7,x2:OX+deckWpx,y2:BT+BH*i/7,stroke:"#999","stroke-width":"0.5"}));
               }
 
-              // Stringer — validated component
-              if(hasStairs){
-                add(el("polygon",{points:buildStringer(),fill:"#F5F0E8",stroke:"#1a1a1a","stroke-width":"0.9"}));
-                // Treads
-                for(let i=0;i<nRisers;i++){
-                  add(el("rect",{x:x0+i*gW,y:y0+i*rH,width:gW,height:Math.max(3,DK_PX),fill:"#F5F0E8",stroke:"#1a1a1a","stroke-width":"0.7"}));
-                }
-                // Stringer pads — 300×300×60mm at base
-                const spW=s(300),spH=Math.max(4,s(60));
-                add(el("rect",{x:x0+stW-spW/2,y:GY,width:spW,height:spH,fill:"#E8E8E8",stroke:"#1a1a1a","stroke-width":"0.7"}));
-                for(let h=1;h<=2;h++) add(el("line",{x1:x0+stW-spW/2,y1:GY+h*spH/3,x2:x0+stW+spW/2,y2:GY+h*spH/3,stroke:"#aaa","stroke-width":"0.3"}));
-                // Angle label
-                add(el("text",{x:x0+stW*0.42,y:y0+(GY-FFL_Y)*0.55,fontSize:8,fill:"#666","text-anchor":"middle"},`${stairAngle}°`));
+              // Stringer from validated component
+              if(stair){
+                add(e("polygon",{points:stair.poly,fill:"#F5F0E8",stroke:"#1a1a1a","stroke-width":"0.9"}));
+                stair.treads.forEach(t=>add(e("rect",{x:t.x,y:t.y,width:t.w,height:t.h,fill:"#F5F0E8",stroke:"#1a1a1a","stroke-width":"0.7"})));
+                add(e("rect",{x:stair.padX,y:stair.padY,width:stair.padW,height:stair.padH,fill:"#E8E8E8",stroke:"#1a1a1a","stroke-width":"0.7"}));
+                for(let h=1;h<=2;h++) add(e("line",{x1:stair.padX,y1:stair.padY+h*stair.padH/3,x2:stair.padX+stair.padW,y2:stair.padY+h*stair.padH/3,stroke:"#aaa","stroke-width":"0.3"}));
+                add(e("text",{x:OX+deckWpx+stair.stW*0.42,y:FFL_Y+(L.GY-FFL_Y)*0.55,fontSize:8,fill:"#888","text-anchor":"middle"},`${D.stair.angle}deg`));
               }
 
-              // ── LABELS — right side, spaced 22px apart min ──
-              const LPAD=OX+deckWpx+(hasStairs?stRunPx:0)+18;
+              // ── LABELS right side, stacked with 22px gap ──
+              const LPAD=OX+deckWpx+stRunPx+12;
               const lbls=[
-                {y:DK_TOP+DK_PX/2,     t:"Decking 90×19",   s:boardDir+" boards"},
-                {y:Math.max(JT_TOP+JT_PX/2, DK_TOP+24),  t:`Joist ${JT_H}×45 H3`, s:"@ 450mm ctrs"},
-                {y:Math.max(BR_TOP+BR_PX/2, DK_TOP+48),  t:hasBal?"2/140×45 H4":"140×45 H4", s:"bearer"},
-                {y:PIR_TOP+PIR_PX/2,   t:"Uni-Pier",         s:`${PIR_H}mm`},
-                {y:GY+PAD_PX*0.45,     t:"Pad footing",      s:"400×400×400mm"},
+                {y:L.DK_TOP+L.DKpx/2,   t:`Decking ${D.decking.D}x${D.decking.W}`, s:D.boardDir+" boards"},
+                {y:L.JT_TOP+L.JTpx/2,   t:`Joist ${D.joist.D}x${D.joist.W} ${D.joist.grade}`, s:`@ ${D.joist.spacingMm}mm ctrs`},
+                {y:L.BR_TOP+L.BRpx/2,   t:D.bearer.label, s:"bearer"},
+                {y:L.PIR_TOP+L.PIRpx/2, t:"Uni-Pier", s:`${R.pierH}mm`},
+                {y:L.GY+L.PADpx/2,      t:"Pad footing", s:`${D.footing.W}x${D.footing.D}x${D.footing.H}mm`},
               ];
-              if(hasStairs) lbls.push({y:y0+(GY-y0)*0.45,t:"Stringer 300×45",s:"notched · open tread"});
-              if(hasBal) lbls.push({y:BAL_TOP+BAL_PX/2,t:`Balustrade`,s:`${BAL_H}mm`});
-
-              lbls.forEach(({y,t,s},i)=>{
-                add(el("text",{x:LPAD,y:y+2,fontSize:8.5,fill:"#1a1a1a","font-weight":"500"},t));
-                if(s) add(el("text",{x:LPAD,y:y+13,fontSize:7.5,fill:"#666"},s));
+              if(D.hasStairs) lbls.push({y:FFL_Y+(L.GY-FFL_Y)*0.35,t:"Stringer 300x45",s:"notched open tread"});
+              if(D.hasBal) lbls.splice(0,0,{y:L.BAL_TOP+L.BALpx/2,t:`Balustrade`,s:`${D.balH}mm`});
+              // Enforce 20px minimum gap
+              let lastY=-999;
+              lbls.forEach(({y,t,s})=>{
+                const ay=Math.max(y,lastY+20);
+                lastY=ay+(s?22:12);
+                add(e("text",{x:LPAD,y:ay+2,fontSize:8.5,fill:"#1a1a1a","font-weight":"500"},t));
+                if(s) add(e("text",{x:LPAD,y:ay+13,fontSize:7.5,fill:"#666"},s));
               });
 
-              // ── DIMS — left side for member depths, right for heights ──
-              // Member depth brackets (left of deck)
-              [[DK_TOP,DK_TOP+DK_PX,"19"],[JT_TOP,JT_TOP+JT_PX,"90"],[BR_TOP,BR_BOT,"140"]].forEach(([y1,y2,lbl])=>{
-                const bx=OX-12;
-                add(el("line",{x1:OX-2,y1:y1,x2:bx,y2:y1,stroke:"#888","stroke-width":"0.5"}));
-                add(el("line",{x1:OX-2,y1:y2,x2:bx,y2:y2,stroke:"#888","stroke-width":"0.5"}));
-                add(el("line",{x1:bx,y1:y1,x2:bx,y2:y2,stroke:"#888","stroke-width":"0.5"}));
-                add(el("text",{x:bx-2,y:(y1+y2)/2+3,fontSize:7.5,fill:"#666","text-anchor":"end"},lbl));
+              // ── DIMS ──
+              // Left: member depths
+              [[L.DK_TOP,L.DK_TOP+L.DKpx,"19"],[L.JT_TOP,L.JT_TOP+L.JTpx,`${D.joist.D}`],[L.BR_TOP,L.BR_BOT,`${D.bearer.D}`]].forEach(([y1,y2,lbl])=>{
+                const bx=OX-14;
+                add(e("line",{x1:OX-2,y1:y1,x2:bx,y2:y1,stroke:"#888","stroke-width":"0.5"}));
+                add(e("line",{x1:OX-2,y1:y2,x2:bx,y2:y2,stroke:"#888","stroke-width":"0.5"}));
+                add(e("line",{x1:bx,y1:y1,x2:bx,y2:y2,stroke:"#888","stroke-width":"0.5"}));
+                add(e("text",{x:bx-3,y:(y1+y2)/2+3,fontSize:7.5,fill:"#666","text-anchor":"end"},lbl));
               });
 
-              // FFL dim right
-              const dvx=OX+deckWpx+(hasStairs?stRunPx:0)+LPAD-OX+60;
-              // Keep simple — just two key dims
-              const addDV=(x,y1,y2,lbl)=>{
+              // Left: FFL and pier dims
+              const dv=(x,y1,y2,lbl)=>{
                 if(Math.abs(y2-y1)<4)return;
                 const my=(y1+y2)/2;
-                add(el("line",{x1:x,y1:y1,x2:x,y2:y2,stroke:"#555","stroke-width":"0.5"}));
-                add(el("line",{x1:x-3,y1:y1,x2:x+3,y2:y1,stroke:"#555","stroke-width":"0.5"}));
-                add(el("line",{x1:x-3,y1:y2,x2:x+3,y2:y2,stroke:"#555","stroke-width":"0.5"}));
-                add(el("text",{x:x+12,y:my+3,fontSize:8,fill:"#333","text-anchor":"middle",transform:`rotate(-90,${x+12},${my})`},lbl));
+                add(e("line",{x1:x,y1:y1,x2:x,y2:y2,stroke:"#555","stroke-width":"0.5"}));
+                add(e("line",{x1:x-3,y1:y1,x2:x+3,y2:y1,stroke:"#555","stroke-width":"0.5"}));
+                add(e("line",{x1:x-3,y1:y2,x2:x+3,y2:y2,stroke:"#555","stroke-width":"0.5"}));
+                add(e("text",{x:x-12,y:my+3,fontSize:8,fill:"#333","text-anchor":"middle",transform:`rotate(-90,${x-12},${my})`},lbl));
               };
-              // Place dims between labels and edge of SVG
-              const dimCol1=OX-42, dimCol2=OX-58;
-              addDV(dimCol1,GY,FFL_Y,`${FFL}mm FFL`);
-              addDV(dimCol2,GY,PIR_TOP,`${PIR_H}mm pier`);
-              if(hasBal) addDV(OX+deckWpx+(hasStairs?stRunPx:0)+8,FFL_Y,BAL_TOP,`${BAL_H}mm`);
-              addDV(OX-70,GY,GY+PAD_PX,"400mm");
+              dv(OX-40,FFL_Y,L.GY,`${D.FFL}mm FFL`);
+              dv(OX-56,L.PIR_TOP,L.GY,`${R.pierH}mm`);
+              dv(OX-72,L.GY,L.GY+L.PADpx,"400mm");
+              if(D.hasBal) dv(OX-40,L.BAL_TOP,FFL_Y,`${D.balH}mm`);
 
               // Bottom dims
-              const dimY=GY+PAD_PX+20;
-              [[OX,OX+deckWpx,`${Math.round(Dm*1000)}mm`],
-               ...(hasStairs?[[OX+deckWpx,OX+deckWpx+stRunPx,`${stairRun}mm`]]:[])]
+              const dimY=L.GY+L.PADpx+18;
+              [[OX,OX+deckWpx,`${Math.round(D.deckWmm)}mm`],
+               ...(D.hasStairs?[[OX+deckWpx,OX+deckWpx+stRunPx,`${D.stair.stairRun}mm`]]:[])]
               .forEach(([x1,x2,lbl])=>{
-                add(el("line",{x1,y1:dimY,x2,y2:dimY,stroke:"#555","stroke-width":"0.6"}));
-                add(el("line",{x1,y1:dimY-3,x2:x1,y2:dimY+3,stroke:"#555","stroke-width":"0.6"}));
-                add(el("line",{x1:x2,y1:dimY-3,x2,y2:dimY+3,stroke:"#555","stroke-width":"0.6"}));
-                add(el("text",{x:(x1+x2)/2,y:dimY+13,fontSize:9,fill:"#333","text-anchor":"middle"},lbl));
+                add(e("line",{x1,y1:dimY,x2,y2:dimY,stroke:"#555","stroke-width":"0.6"}));
+                add(e("line",{x1,y1:dimY-3,x2:x1,y2:dimY+3,stroke:"#555","stroke-width":"0.6"}));
+                add(e("line",{x1:x2,y1:dimY-3,x2,y2:dimY+3,stroke:"#555","stroke-width":"0.6"}));
+                add(e("text",{x:(x1+x2)/2,y:dimY+13,fontSize:9,fill:"#333","text-anchor":"middle"},lbl));
               });
 
               // Scale bar
-              const sbx=OX,sby=CVS_H-18;
-              add(el("line",{x1:sbx,y1:sby,x2:sbx+100,y2:sby,stroke:"#333","stroke-width":"1"}));
-              add(el("line",{x1:sbx,y1:sby-4,x2:sbx,y2:sby+4,stroke:"#333","stroke-width":"1"}));
-              add(el("line",{x1:sbx+100,y1:sby-4,x2:sbx+100,y2:sby+4,stroke:"#333","stroke-width":"1"}));
-              add(el("rect",{x:sbx,y:sby-4,width:50,height:4,fill:"#333"}));
-              add(el("text",{x:sbx,y:sby+11,fontSize:7.5,fill:"#333"},"0"));
-              add(el("text",{x:sbx+50,y:sby+11,fontSize:7.5,fill:"#333","text-anchor":"middle"},"500mm"));
-              add(el("text",{x:sbx+100,y:sby+11,fontSize:7.5,fill:"#333","text-anchor":"middle"},"1000mm"));
-              add(el("text",{x:sbx+112,y:sby+11,fontSize:7.5,fill:"#999"},"Scale 1:10 · AS1684 · AS1657"));
+              const sbY=CVS_H-16;
+              add(e("rect",{x:OX,y:sbY-5,width:50,height:5,fill:"#333"}));
+              add(e("rect",{x:OX+50,y:sbY-5,width:50,height:5,fill:"white",stroke:"#333","stroke-width":"0.8"}));
+              add(e("text",{x:OX,y:sbY+9,fontSize:7.5,fill:"#333"},"0"));
+              add(e("text",{x:OX+50,y:sbY+9,fontSize:7.5,fill:"#333","text-anchor":"middle"},"500mm"));
+              add(e("text",{x:OX+100,y:sbY+9,fontSize:7.5,fill:"#333","text-anchor":"middle"},"1000mm"));
+              add(e("text",{x:OX+108,y:sbY+9,fontSize:7.5,fill:"#999"},"Scale 1:10 · AS1684 · AS1657"));
 
               ref.appendChild(svg);
             }})

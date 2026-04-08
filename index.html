@@ -584,7 +584,7 @@ function App(){
           // Canvas
           const ML=60,MR=60,MT=50,MB=60;
           const CVS_W=Math.max(400,deckWpx+ML+MR+80);
-          const CVS_H=Math.max(300,deckDpx+MT+MB+80);
+          const CVS_H=Math.max(320,deckDpx+MT+MB+110);
           const OX=ML,OY=MT;
 
           // Footing grid
@@ -692,40 +692,43 @@ function App(){
               if(sr){
                 add(e("rect",{x:sr.x,y:sr.y,width:sr.w,height:sr.h,
                   fill:"#F5F0E8",stroke:"#1a1a1a","stroke-width":"0.8","stroke-dasharray":"3,2"}));
-                // Stair direction arrows (treads shown as lines)
-                const nT=nRisers;
-                for(let i=0;i<nT;i++){
-                  const f=(i+0.5)/nT;
-                  if(stairFace==="N"||stairFace==="S"){
-                    const ty=sr.y+(stairFace==="S"?f*sr.h:(1-f)*sr.h);
+                // Tread lines — full width, evenly spaced across stair run
+                // Lines run perpendicular to stair direction
+                const isNS=stairFace==="N"||stairFace==="S";
+                for(let i=1;i<nRisers;i++){
+                  const f=i/nRisers;
+                  if(isNS){
+                    // Treads horizontal — lines run E-W across stair width
+                    const ty=stairFace==="S"?sr.y+f*sr.h:sr.y+(1-f)*sr.h;
                     add(e("line",{x1:sr.x,y1:ty,x2:sr.x+sr.w,y2:ty,
-                      stroke:"#aaa","stroke-width":"0.5"}));
+                      stroke:"#999","stroke-width":"0.6"}));
                   } else {
-                    const tx=sr.x+(stairFace==="E"?f*sr.w:(1-f)*sr.w);
+                    // Treads vertical — lines run N-S across stair width
+                    const tx=stairFace==="E"?sr.x+f*sr.w:sr.x+(1-f)*sr.w;
                     add(e("line",{x1:tx,y1:sr.y,x2:tx,y2:sr.y+sr.h,
-                      stroke:"#aaa","stroke-width":"0.5"}));
+                      stroke:"#999","stroke-width":"0.6"}));
                   }
                 }
+                // Down arrow showing direction
+                const ax=sr.x+sr.w/2, ay=sr.y+sr.h/2;
+                add(e("text",{x:ax,y:ay+4,fontSize:9,fill:"#888","text-anchor":"middle","font-style":"italic"},"dn"));
               }
 
-              // Section A-A cut line
+              // Section A-A cut line — long dash dot pattern
               const isEWcut=boardDir==="EW";
               if(isEWcut){
-                // Cut E-W — horizontal line at mid-depth
-                add(e("line",{x1:OX-20,y1:sectionY,x2:OX+deckWpx+20,y2:sectionY,
-                  stroke:"#1a1a1a","stroke-width":"0.6","stroke-dasharray":"8,3,2,3"}));
-                // A markers
-                [[OX-20,sectionY],[OX+deckWpx+20,sectionY]].forEach(([cx,cy],i)=>{
-                  add(e("circle",{cx,cy,r:8,fill:"white",stroke:"#1a1a1a","stroke-width":"0.8"}));
-                  add(e("text",{x:cx,y:cy+4,fontSize:8,fill:"#1a1a1a","text-anchor":"middle","font-weight":"500"},"A"));
+                add(e("line",{x1:OX-30,y1:sectionY,x2:OX+deckWpx+30,y2:sectionY,
+                  stroke:"#333","stroke-width":"0.7","stroke-dasharray":"10,4,2,4"}));
+                [[OX-30,sectionY],[OX+deckWpx+30,sectionY]].forEach(([cx,cy])=>{
+                  add(e("circle",{cx,cy,r:9,fill:"white",stroke:"#333","stroke-width":"1"}));
+                  add(e("text",{x:cx,y:cy+4,fontSize:9,fill:"#333","text-anchor":"middle","font-weight":"600"},"A"));
                 });
               } else {
-                // Cut N-S — vertical line at mid-length
-                add(e("line",{x1:sectionX,y1:OY-20,x2:sectionX,y2:OY+deckDpx+20,
-                  stroke:"#1a1a1a","stroke-width":"0.6","stroke-dasharray":"8,3,2,3"}));
-                [[sectionX,OY-20],[sectionX,OY+deckDpx+20]].forEach(([cx,cy])=>{
-                  add(e("circle",{cx,cy,r:8,fill:"white",stroke:"#1a1a1a","stroke-width":"0.8"}));
-                  add(e("text",{x:cx,y:cy+4,fontSize:8,fill:"#1a1a1a","text-anchor":"middle","font-weight":"500"},"A"));
+                add(e("line",{x1:sectionX,y1:OY-30,x2:sectionX,y2:OY+deckDpx+30,
+                  stroke:"#333","stroke-width":"0.7","stroke-dasharray":"10,4,2,4"}));
+                [[sectionX,OY-30],[sectionX,OY+deckDpx+30]].forEach(([cx,cy])=>{
+                  add(e("circle",{cx,cy,r:9,fill:"white",stroke:"#333","stroke-width":"1"}));
+                  add(e("text",{x:cx,y:cy+4,fontSize:9,fill:"#333","text-anchor":"middle","font-weight":"600"},"A"));
                 });
               }
 
@@ -751,8 +754,8 @@ function App(){
               add(e("text",{x:dimX2+14,y:OY+deckDpx/2+3,fontSize:9,fill:"#333",
                 "text-anchor":"middle",transform:`rotate(-90,${dimX2+14},${OY+deckDpx/2})`},`${Math.round(Dm*1000)}mm`));
 
-              // Scale bar
-              const sbx=OX,sby=OY+deckDpx+48;
+              // Scale bar — below dims
+              const sbx=OX,sby=OY+deckDpx+68;
               add(e("line",{x1:sbx,y1:sby,x2:sbx+100,y2:sby,stroke:"#333","stroke-width":"1"}));
               add(e("line",{x1:sbx,y1:sby-4,x2:sbx,y2:sby+4,stroke:"#333","stroke-width":"1"}));
               add(e("line",{x1:sbx+100,y1:sby-4,x2:sbx+100,y2:sby+4,stroke:"#333","stroke-width":"1"}));

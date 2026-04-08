@@ -750,8 +750,8 @@ function App(){
             return parts.join(" · ");
           })()
         ),
-        screen===6&&React.createElement(PBtn,{label:"See drawings →",onClick:()=>go(6)}),
-        screen===6&&React.createElement(BackBtn,null)
+        screen===5&&React.createElement(PBtn,{label:"See drawings →",onClick:()=>go(6)}),
+        screen===5&&React.createElement(BackBtn,null)
       ),
 
       // ── SCREEN 6: Technical drawings ─────────────────────────────
@@ -1018,8 +1018,8 @@ function App(){
             )
           );
         })()),
-        screen===7&&React.createElement(PBtn,{label:"See 3D set out →",onClick:()=>go(7)}),
-        screen===7&&React.createElement(BackBtn,null)
+        screen===6&&React.createElement(PBtn,{label:"See 3D set out →",onClick:()=>go(7)}),
+        screen===6&&React.createElement(BackBtn,null)
       ),
 
       // ── SCREEN 7: 3D Set out ────────────────────────────────────
@@ -1044,8 +1044,8 @@ function App(){
           React.createElement("b",{style:{color:TX}},"Structure: "),
           `${est.rules.nFootings} footings · ${est.rules.nBearerRows} bearer rows × ${est.rules.nPostsPerBearer} posts · ${est.rules.joistLabel} joists`
         ),
-        screen===8&&React.createElement(PBtn,{label:"See my estimate →",onClick:()=>go(8)}),
-        screen===8&&React.createElement(BackBtn,null)
+        screen===7&&React.createElement(PBtn,{label:"See my estimate →",onClick:()=>go(8)}),
+        screen===7&&React.createElement(BackBtn,null)
       ),
 
       // ── SCREEN 8: Estimate + Save ───────────────────────────────

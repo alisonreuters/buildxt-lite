@@ -701,7 +701,7 @@ function App(){
           )
         )),
         card(React.createElement("div",null,
-          lbl("Deck zones"),
+          React.createElement("div",{style:{fontSize:11,fontWeight:600,color:"#aaa",textTransform:"uppercase",letterSpacing:1,marginBottom:8}},"Deck zones"),
           React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginTop:8}},
             React.createElement("div",null,
               React.createElement("div",{style:{fontSize:12,color:"#aaa",marginBottom:6,fontWeight:500}},"Alfresco"),
@@ -735,7 +735,7 @@ function App(){
                 onClick:()=>{upd("stairType",k);if(k==="none")upd("stairWidthMm",0);else if(!form.stairWidthMm)upd("stairWidthMm",1200);}},l))
           ),
           form.stairType!=="none"&&React.createElement("div",{style:{marginBottom:10}},
-            lbl("Stair face — which side does it exit?"),
+            React.createElement("div",{style:{fontSize:11,fontWeight:600,color:"#aaa",textTransform:"uppercase",letterSpacing:1,marginBottom:6}},"Stair face"),
             React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:6,marginBottom:10}},
               [["N","North"],["S","South"],["E","East"],["W","West"]].map(([k,l])=>
                 React.createElement("button",{key:k,

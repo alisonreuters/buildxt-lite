@@ -766,7 +766,7 @@ function App(){
           const stairAbove=D.hasStairs&&(D.stairFace==="N");
           const stairRight=D.hasStairs&&(D.stairFace==="E");
           const stairLeft=D.hasStairs&&(D.stairFace==="W");
-          const CVS_W=Math.round(deckWpx+ML+MR+(stairRight?stRunPx+10:0)+(stairLeft?stRunPx+10:0));
+          const CVS_W=Math.round(deckWpx+ML+MR+30+(stairRight?stRunPx+10:0)+(stairLeft?stRunPx+10:0));
           const CVS_H=Math.round(deckDpx+MT+MB+(stairBelow?stRunPx+10:0)+(stairAbove?stRunPx+10:0));
           const OX=ML+(stairLeft?stRunPx+10:0);
           const OY=MT+(stairAbove?stRunPx+10:0);
@@ -808,18 +808,14 @@ function App(){
               const add=el=>svg.appendChild(el);
 
               // Title
-              add(e("text",{x:OX,y:18,fontSize:7.5,fill:"#bbb"},
+              add(e("text",{x:OX,y:16,fontSize:6.5,fill:"#ccc"},
                 `Plan view · ${D.Lm}m × ${D.Dm}m · FFL ${D.FFL}mm · ${D.boardDir} boards`));
 
-              // N/S/E/W compass labels — light grey at edges
-              const cLabels=[
-                {t:"N",x:OX+deckWpx/2, y:OY-16,   anchor:"middle"},
-                {t:"S",x:OX+deckWpx/2, y:OY+deckDpx+20, anchor:"middle"},
-                {t:"W",x:OX-16,        y:OY+deckDpx/2+4, anchor:"end"},
-                {t:"E",x:OX+deckWpx+16,y:OY+deckDpx/2+4, anchor:"start"},
-              ];
-              cLabels.forEach(({t,x,y,anchor})=>
-                add(e("text",{x,y,fontSize:10,fill:"#ccc","text-anchor":anchor,"font-weight":"500"},t)));
+              // N/S/E/W — small, light grey, well clear of dims
+              add(e("text",{x:OX+deckWpx/2,y:OY-8,fontSize:8,fill:"#ccc","text-anchor":"middle"},"N"));
+              add(e("text",{x:OX+deckWpx/2,y:OY+deckDpx+14,fontSize:8,fill:"#ccc","text-anchor":"middle"},"S"));
+              add(e("text",{x:OX-10,y:OY+deckDpx/2+3,fontSize:8,fill:"#ccc","text-anchor":"end"},"W"));
+              add(e("text",{x:OX+deckWpx+10,y:OY+deckDpx/2+3,fontSize:8,fill:"#ccc","text-anchor":"start"},"E"));
 
               // House wall thick line
               const hwLine={
@@ -872,21 +868,21 @@ function App(){
                 add(e("circle",{cx:bx,cy:by,r:4,fill:"#1a1a1a",stroke:"white","stroke-width":"1.2"}));
               }));
 
-              // Section A-A — extends well past deck edges
-              const ext=28;
+              // Section A-A — smaller, sits just outside deck edge
+              const ext=16;
               if(D.sectionCutDir==="NS"){
                 add(e("line",{x1:sectionX,y1:OY-ext,x2:sectionX,y2:OY+deckDpx+ext,
-                  stroke:"#555","stroke-width":"0.7","stroke-dasharray":"10,3,2,3"}));
-                [[sectionX,OY-ext-12],[sectionX,OY+deckDpx+ext+12]].forEach(([x,y])=>{
-                  add(e("circle",{cx:x,cy:y,r:9,fill:"white",stroke:"#555","stroke-width":"1"}));
-                  add(e("text",{x,y:y+4,fontSize:9,fill:"#555","text-anchor":"middle","font-weight":"600"},"A"));
+                  stroke:"#888","stroke-width":"0.6","stroke-dasharray":"8,3,2,3"}));
+                [[sectionX,OY-ext-8],[sectionX,OY+deckDpx+ext+8]].forEach(([x,y])=>{
+                  add(e("circle",{cx:x,cy:y,r:6,fill:"white",stroke:"#888","stroke-width":"0.8"}));
+                  add(e("text",{x,y:y+3,fontSize:7,fill:"#888","text-anchor":"middle","font-weight":"600"},"A"));
                 });
               } else {
                 add(e("line",{x1:OX-ext,y1:sectionY,x2:OX+deckWpx+ext,y2:sectionY,
-                  stroke:"#555","stroke-width":"0.7","stroke-dasharray":"10,3,2,3"}));
-                [[OX-ext-12,sectionY],[OX+deckWpx+ext+12,sectionY]].forEach(([x,y])=>{
-                  add(e("circle",{cx:x,cy:y,r:9,fill:"white",stroke:"#555","stroke-width":"1"}));
-                  add(e("text",{x,y:y+4,fontSize:9,fill:"#555","text-anchor":"middle","font-weight":"600"},"A"));
+                  stroke:"#888","stroke-width":"0.6","stroke-dasharray":"8,3,2,3"}));
+                [[OX-ext-8,sectionY],[OX+deckWpx+ext+8,sectionY]].forEach(([x,y])=>{
+                  add(e("circle",{cx:x,cy:y,r:6,fill:"white",stroke:"#888","stroke-width":"0.8"}));
+                  add(e("text",{x,y:y+3,fontSize:7,fill:"#888","text-anchor":"middle","font-weight":"600"},"A"));
                 });
               }
 
@@ -897,7 +893,7 @@ function App(){
               add(e("line",{x1:OX+deckWpx,y1:dimY-3,x2:OX+deckWpx,y2:dimY+3,stroke:"#555","stroke-width":"0.6"}));
               add(e("text",{x:OX+deckWpx/2,y:dimY+13,fontSize:9,fill:"#333","text-anchor":"middle"},`${D.Lm}m`));
 
-              const dimX=OX+deckWpx+(stairRight?stRunPx+12:12);
+              const dimX=OX+deckWpx+(stairRight?stRunPx+28:28);
               add(e("line",{x1:dimX,y1:OY,x2:dimX,y2:OY+deckDpx,stroke:"#555","stroke-width":"0.6"}));
               add(e("line",{x1:dimX-3,y1:OY,x2:dimX+3,y2:OY,stroke:"#555","stroke-width":"0.6"}));
               add(e("line",{x1:dimX-3,y1:OY+deckDpx,x2:dimX+3,y2:OY+deckDpx,stroke:"#555","stroke-width":"0.6"}));

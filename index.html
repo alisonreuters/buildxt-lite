@@ -781,7 +781,7 @@ function App(){
 
           // Canvas layout
           const ML=160; const MR=110; const MT=30; const MB=60;
-          const CVS_W=830;
+          const CVS_W=900;
           const OX=ML; // left edge of deck in px
 
           // Deck width and stair
@@ -838,14 +838,15 @@ function App(){
             );
           };
 
-          // Word label helper — LEFT side
+          // Word label helper — RIGHT side, past dim lines
+          const RMARGIN=OX+s(Dm*1000)+(hasStairs?s(stairRun):0)+75;
           const WLBL=(y,title,sub)=>React.createElement("g",null,
-            React.createElement("line",{x1:OX-2,y1:y,x2:OX-20,y2:y,
-              stroke:"#aaa",strokeWidth:0.4,strokeDasharray:"2,2"}),
-            React.createElement("text",{x:OX-22,y:y-3,fontSize:8.5,fill:"#1a1a1a",
-              textAnchor:"end",fontWeight:500},title),
-            sub&&React.createElement("text",{x:OX-22,y:y+8,fontSize:7.5,fill:"#666",
-              textAnchor:"end"},sub)
+            React.createElement("line",{x1:OX+s(Dm*1000)+2,y1:y,x2:RMARGIN-4,y2:y,
+              stroke:"#ccc",strokeWidth:0.4,strokeDasharray:"2,2"}),
+            React.createElement("text",{x:RMARGIN,y:y-2,fontSize:8.5,fill:"#1a1a1a",
+              textAnchor:"start",fontWeight:500},title),
+            sub&&React.createElement("text",{x:RMARGIN,y:y+9,fontSize:7.5,fill:"#666",
+              textAnchor:"start"},sub)
           );
 
           // Pier positions across deck width
@@ -863,16 +864,24 @@ function App(){
           const dlen=Math.sqrt(ddx*ddx+ddy*ddy);
           const nx=dlen>0?(ddy/dlen)*strD:0;
           const ny=dlen>0?(-ddx/dlen)*strD:0;
-          const topPts=hasStairs?[[x0,y0]]:[];
-          if(hasStairs){
+          // Stringer: solid 300×45 notched from top
+          // Top edge = zig-zag step profile
+          // Bottom edge = straight diagonal offset by stringer depth
+          const buildStringer=()=>{
+            if(!hasStairs) return "";
+            // Top edge: starts at deck edge, steps RIGHT then DOWN
+            const top=[[x0,y0]];
             for(let i=0;i<nRisers;i++){
-              topPts.push([x0+i*gW+gW, y0+i*rH]);
-              topPts.push([x0+i*gW+gW, y0+i*rH+rH]);
+              top.push([x0+(i+1)*gW, y0+i*rH]);      // horizontal going
+              if(i<nRisers-1) top.push([x0+(i+1)*gW, y0+(i+1)*rH]); // vertical riser
             }
-          }
-          const stringerPts=hasStairs?[...topPts,
-            [x0+stW+nx,GY+ny],[x0+nx,y0+ny]]:[];
-          const poly=stringerPts.map(([px,py])=>`${px.toFixed(1)},${py.toFixed(1)}`).join(" ");
+            top.push([x0+stW, GY]); // bottom right corner
+            // Bottom edge: parallel to hypotenuse, offset by strD
+            top.push([x0+stW+nx, GY+ny]);
+            top.push([x0+nx, y0+ny]);
+            return top.map(([px,py])=>`${px.toFixed(1)},${py.toFixed(1)}`).join(" ");
+          };
+          const poly=buildStringer();
 
           return React.createElement("div",null,
             React.createElement("div",{style:{fontSize:10,fontWeight:600,color:"#888",

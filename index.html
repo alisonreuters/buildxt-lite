@@ -838,16 +838,8 @@ function App(){
             );
           };
 
-          // Word label helper — RIGHT side, past dim lines
-          const RMARGIN=OX+s(Dm*1000)+(hasStairs?s(stairRun):0)+75;
-          const WLBL=(y,title,sub)=>React.createElement("g",null,
-            React.createElement("line",{x1:OX+s(Dm*1000)+2,y1:y,x2:RMARGIN-4,y2:y,
-              stroke:"#ccc",strokeWidth:0.4,strokeDasharray:"2,2"}),
-            React.createElement("text",{x:RMARGIN,y:y-2,fontSize:8.5,fill:"#1a1a1a",
-              textAnchor:"start",fontWeight:500},title),
-            sub&&React.createElement("text",{x:RMARGIN,y:y+9,fontSize:7.5,fill:"#666",
-              textAnchor:"start"},sub)
-          );
+          // Labels rendered inline below with spacing logic
+          const WLBL=()=>null; // placeholder — labels handled inline
 
           // Pier positions across deck width
           const nBRows=Math.ceil(Dm*1000/1800)+1;
@@ -1021,13 +1013,25 @@ function App(){
                   stroke:"#999",strokeWidth:0.3}))
               ),
 
-              // ── LEFT WORD LABELS ──
-              WLBL(DK_TOP+DK_PX/2,`Decking ${JT_SIZE===90?"90":"140"}×19`,boardDir+" boards"),
-              WLBL(JT_TOP+JT_PX/2,`Joist ${JT_SIZE}×45 H3`,"@ 450mm ctrs"),
-              WLBL(BR_TOP+BR_PX/2,hasBal?"2/140×45 H4 bearer":"140×45 H4 bearer"),
-              WLBL(PIR_TOP+PIR_PX/2,"Uni-Pier","adjustable steel"),
-              WLBL(GY+PAD_PX/2,"Pad footing","400×400×400mm"),
-              hasStairs&&WLBL(y0+(GY-FFL_Y)*0.5+10,"Stringer 300×45","notched · open tread"),
+              // ── WORD LABELS RIGHT — spaced to avoid overlap ──
+              // Min 22px gap between labels (each label ~20px tall with sub)
+              (()=>{
+                const RPAD=OX+deckWpx+(hasStairs?stRunPx:0)+72;
+                const lbls=[
+                  [DK_TOP+DK_PX/2,       `Decking 90×19`,         boardDir+" boards"],
+                  [Math.max(JT_TOP+JT_PX/2, DK_TOP+DK_PX/2+22), `Joist ${JT_SIZE}×45 H3`,"@ 450mm ctrs"],
+                  [Math.max(BR_TOP+BR_PX/2, DK_TOP+DK_PX/2+44), hasBal?"2/140×45 H4 bearer":"140×45 H4 bearer", hasBal?"Double — bal. load":null],
+                  [Math.max(PIR_TOP+PIR_PX/2, DK_TOP+DK_PX/2+72),"Uni-Pier","adjustable steel"],
+                  [GY+PAD_PX/2,            "Pad footing",           "400×400×400mm"],
+                ];
+                if(hasStairs) lbls.push([y0+(GY-FFL_Y)*0.55,"Stringer 300×45","notched · open tread"]);
+                return lbls.map(([y,t,s],i)=>React.createElement("g",{key:`lbl${i}`},
+                  React.createElement("text",{x:RPAD,y:y,fontSize:8.5,fill:"#1a1a1a",
+                    textAnchor:"start",fontWeight:500},t),
+                  s&&React.createElement("text",{x:RPAD,y:y+11,fontSize:7.5,fill:"#666",
+                    textAnchor:"start"},s)
+                ));
+              })(),
 
               // ── RIGHT DIMS ONLY ──
               // FFL total height

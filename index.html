@@ -628,12 +628,7 @@ screen===3&&(form.projectType==="Deck"||form.projectType==="Concrete Slab")&&Rea
         form.houseWall&&React.createElement(PBtn,{label:"Continue →",onClick:()=>go(4)}),
         React.createElement(BackBtn,null)
       ),
-      screen===3&&form.projectType!=="Deck"&&React.createElement("div",{className:"fade"},
-        jeff(`Got it — let's do a ${form.projectType}.`,"More assembly types are on the way. Start with a deck to try Jeff."),
-        React.createElement(PBtn,{label:"Switch to deck",onClick:()=>upd("projectType","Deck")}),
-        React.createElement(BackBtn,null)
-      ),
-
+      
       // ── SCREEN 4: Site + Spec ───────────────────────────────────
       screen===4&&React.createElement("div",{className:"fade"},
         jeff("Tell me about the site and what you'd like"),
@@ -874,12 +869,7 @@ screen===3&&(form.projectType==="Deck"||form.projectType==="Concrete Slab")&&Rea
           )
         )),
         React.createElement(PBtn,{label:"Continue — Concrete base for timber deck →",onClick:()=>go(4)}),
-        React.createElement("button",{
-          onClick:()=>upd("projectType","Deck"),
-          style:{display:"block",width:"100%",padding:"14px",marginTop:8,
-            borderRadius:14,border:`1px solid ${BD}`,background:"white",
-            fontSize:14,fontWeight:500,color:"#555",cursor:"pointer"}
-        },"Switch to timber framed deck"),
+
         React.createElement(BackBtn,null)
       ),
 

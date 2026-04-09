@@ -79,7 +79,10 @@ function calcDeck(inputs) {
 
   // ── RULE: SECTION CUT DIRECTION ──────────────────────────
   // Section A-A always cuts perpendicular to board direction
-  const sectionCutDir = boardDir === "EW" ? "NS" : "EW";
+  // Section A-A cuts perpendicular to joists (which run perpendicular to boards)
+  // EW boards → NS joists → section cuts EW (view from N or S)
+  // NS boards → EW joists → section cuts NS (view from E or W)
+  const sectionCutDir = boardDir === "EW" ? "EW" : "NS";
 
   // ── QUANTITIES ────────────────────────────────────────────
   const deckAreaM2  = Lm * Dm;
@@ -707,7 +710,7 @@ function App(){
               React.createElement("div",{style:{fontSize:12,color:"#aaa",marginBottom:6,fontWeight:500}},"Alfresco"),
               React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:5}},
                 [["none","None"],["SW","SW"],["SE","SE"],["NW","NW"]].map(([k,l])=>
-                  React.createElement("button",{key:k,onClick:()=>upd("alfrescoZone",k),
+                  React.createElement("button",{key:k,onClick:()=>{const sc={N:["NW","NE"],S:["SW","SE"],E:["NE","SE"],W:["NW","SW"]};if(k!=="none"&&(sc[form.layoutStairs]||[]).includes(k))return;upd("alfrescoZone",k);},
                     style:{padding:"8px 4px",borderRadius:8,fontSize:12,fontWeight:500,cursor:"pointer",
                       border:form.alfrescoZone===k?`2px solid #378ADD`:`1px solid ${BD}`,
                       background:form.alfrescoZone===k?"#E6F1FB":"white"}},l)
@@ -718,7 +721,7 @@ function App(){
               React.createElement("div",{style:{fontSize:12,color:"#aaa",marginBottom:6,fontWeight:500}},"BBQ"),
               React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:5}},
                 [["none","None"],["SE","SE"],["SW","SW"],["NE","NE"]].map(([k,l])=>
-                  React.createElement("button",{key:k,onClick:()=>upd("bbqZone",k),
+                  React.createElement("button",{key:k,onClick:()=>{const sc={N:["NW","NE"],S:["SW","SE"],E:["NE","SE"],W:["NW","SW"]};if(k!=="none"&&(sc[form.layoutStairs]||[]).includes(k))return;upd("bbqZone",k);},
                     style:{padding:"8px 4px",borderRadius:8,fontSize:12,fontWeight:500,cursor:"pointer",
                       border:form.bbqZone===k?`2px solid #BA7517`:`1px solid ${BD}`,
                       background:form.bbqZone===k?"#FAEEDA":"white"}},l)
@@ -739,7 +742,14 @@ function App(){
             React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:6,marginBottom:10}},
               [["N","North"],["S","South"],["E","East"],["W","West"]].map(([k,l])=>
                 React.createElement("button",{key:k,
-                  onClick:()=>upd("layoutStairs",k),
+                  onClick:()=>{
+                    upd("layoutStairs",k);
+                    // Clear zones that conflict with stair position
+                    const stairCorners={N:["NW","NE"],S:["SW","SE"],E:["NE","SE"],W:["NW","SW"]};
+                    const blocked=stairCorners[k]||[];
+                    if(blocked.some(c=>c===form.alfrescoZone)) upd("alfrescoZone","none");
+                    if(blocked.some(c=>c===form.bbqZone)) upd("bbqZone","none");
+                  },
                   style:{padding:"9px 4px",borderRadius:10,fontSize:13,fontWeight:500,
                     border:form.layoutStairs===k?`2px solid ${Y}`:`1px solid ${BD}`,
                     background:form.layoutStairs===k?"#FFF9E6":"white",cursor:"pointer"}},l)
@@ -1053,10 +1063,9 @@ function App(){
           // NS boards → section is EW cut → stairs appear if on N or S face
           const stairInSection=(()=>{
             if(!D.hasStairs) return false;
-            const cutDir=D.sectionCutDir; // "NS" or "EW"
-            const face=D.stairFace;
-            if(cutDir==="NS") return face==="E"||face==="W";
-            return face==="N"||face==="S";
+            const cutDir=D.sectionCutDir;
+            if(cutDir==="EW") return D.stairFace==="N"||D.stairFace==="S";
+            return D.stairFace==="E"||D.stairFace==="W";
           })();
           // Stair projects from RIGHT side of section drawing
           // For inset stairs, stair starts inside deck not at edge

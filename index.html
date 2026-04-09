@@ -427,7 +427,7 @@ function App(){
     length:"5.0",width:"4.0",siteCondition:"",deckLevel:"ground",
     heightMm:800,houseWall:"bottom",layoutBoard:"EW",layoutStairs:"S",layoutStairsFull:false,
     deckingType:"merbau",stairType:"standard",stairWidthMm:1200,
-    balustradeType:"none",poolAdjacent:false,alfrescoZone:"none",bbqZone:"none",concreteFinish:"trowel",concreteHasBal:false,concreteServices:false
+    balustradeType:"none",poolAdjacent:false,alfrescoZone:"none",bbqZone:"none",concreteFinish:"trowel",concreteTop:"bare",concreteHasBal:false,concreteServices:false
   });
   const [errors,setErrors]=useState({});
   const upd=(k,v)=>setForm(p=>({...p,[k]:v}));
@@ -673,8 +673,16 @@ function App(){
             )
           )
         )),
+        form.deckLevel==="ground"&&jeff("Ground level deck","Pad footings bear on compacted ground. Min 75mm clearance between bearer and finished ground level. Good drainage essential — ensure no ponding under deck."),
+        form.deckLevel==="raised"&&warn("Raised decks over 1800mm FFL require engineer certification and council approval. Jeff will calculate structure but you'll need stamped drawings before building."),
         card(React.createElement("div",null,
           React.createElement("div",{style:{fontSize:13,fontWeight:600,marginBottom:10,color:"#555"}},"Decking board"),
+          form.projectType==="Concrete Slab"&&React.createElement("div",{style:{
+            background:"#FFF9E6",border:"1px solid #EFD080",borderRadius:10,
+            padding:"10px 12px",marginBottom:10,fontSize:12,color:"#555"}},
+            React.createElement("span",{style:{fontWeight:600,color:"#B8860B"}},"Jeff: "),
+            "Timber boards on concrete require 70×45 hardwood battens drilled and plugged into slab at 450mm ctrs. Use 50mm decking screws (not standard 65mm). Allow for batten material and fixing cost."
+          ),
           boardGroups.map(({group,keys})=>React.createElement("div",{key:group,style:{marginBottom:12}},
             React.createElement("div",{style:{fontSize:11,fontWeight:600,color:"#bbb",textTransform:"uppercase",letterSpacing:1,marginBottom:6}},group),
             keys.map(k=>{const bd=BOARDS[k],sel=form.deckingType===k;
@@ -756,12 +764,12 @@ function App(){
         screen===4&&React.createElement(BackBtn,null)
       ),
 
-      // ── SCREEN 4: Concrete Slab spec ───────────────────────
+      // ── SCREEN 4: Concrete Slab — integrated Jeff flow ──────
       screen===4&&form.projectType==="Concrete Slab"&&React.createElement("div",{className:"fade"},
-        jeff("Your concrete slab","Tell Jeff about the slab so he can calculate materials."),
+        jeff("Concrete slab","100mm N25 slab on compacted ground — Jeff calculates your materials."),
         card(React.createElement("div",null,
           React.createElement("div",{style:{fontSize:13,fontWeight:600,marginBottom:8,color:"#555"}},"Dimensions"),
-          React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}},
+          React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:4}},
             React.createElement("div",null,
               React.createElement("div",{style:{fontSize:11,color:"#aaa",marginBottom:4}},"Length (m)"),
               React.createElement("input",{type:"number",value:form.length,
@@ -774,38 +782,67 @@ function App(){
                 onChange:ev=>upd("width",ev.target.value),
                 style:{width:"100%",padding:"10px",borderRadius:10,border:`1px solid ${BD}`,fontSize:16}})
             )
+          ),
+          React.createElement("div",{style:{fontSize:11,color:"#aaa",marginTop:6}},
+            `${(parseFloat(form.length)||0)*(parseFloat(form.width)||0)}m² · 100mm N25 · SL72 mesh · DPM included`)
+        )),
+        card(React.createElement("div",null,
+          React.createElement("div",{style:{fontSize:13,fontWeight:600,marginBottom:10,color:"#555"}},"What goes on top?"),
+          React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}},
+            [["bare","Bare slab"],["timber","Timber deck"],["tile","Tiled"],["paver","Pavers"]].map(([k,l])=>
+              React.createElement("button",{key:k,onClick:()=>upd("concreteTop",k),
+                style:{padding:"10px",borderRadius:11,fontSize:13,fontWeight:form.concreteTop===k?700:400,
+                  border:form.concreteTop===k?`2px solid ${Y}`:`1px solid ${BD}`,
+                  background:form.concreteTop===k?"#FFF9E6":"white",cursor:"pointer"}},l)
+            )
+          ),
+          form.concreteTop==="timber"&&React.createElement("div",{style:{
+            background:"#FFF9E6",border:"1px solid #EFD080",borderRadius:10,padding:"10px 12px",fontSize:12,color:"#555"}},
+            React.createElement("span",{style:{fontWeight:600,color:"#B8860B"}},"Jeff: "),
+            "70x35 hardwood battens drilled and plugged at 450mm ctrs. Use 50mm decking screws. Select your board type in the timber deck flow."
           )
         )),
         card(React.createElement("div",null,
-          React.createElement("div",{style:{fontSize:13,fontWeight:600,marginBottom:8,color:"#555"}},"Finish"),
-          React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}},
-            [["trowel","Steel trowel"],["broom","Broom finish"],["float","Wood float"]].map(([k,l])=>
+          React.createElement("div",{style:{fontSize:13,fontWeight:600,marginBottom:10,color:"#555"}},"Surface finish"),
+          React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}},
+            [["trowel","Steel float"],["broom","Broom finish"]].map(([k,l])=>
               React.createElement("button",{key:k,onClick:()=>upd("concreteFinish",k),
-                style:{padding:"10px",borderRadius:11,fontSize:13,fontWeight:form.concreteFinish===k?700:400,
+                style:{padding:"12px",borderRadius:11,fontSize:13,fontWeight:form.concreteFinish===k?700:400,
                   border:form.concreteFinish===k?`2px solid ${Y}`:`1px solid ${BD}`,
                   background:form.concreteFinish===k?"#FFF9E6":"white",cursor:"pointer"}},l)
             )
           ),
-          React.createElement("div",{style:{fontSize:11,color:"#aaa",marginTop:8}},
-            form.concreteFinish==="trowel"?"Smooth — suitable for direct use or painting":
-            form.concreteFinish==="broom"?"Textured — recommended if tiling over slab":
-            "Open texture — good tile adhesion")
+          React.createElement("div",{style:{fontSize:11,color:"#aaa"}},
+            form.concreteFinish==="broom"
+              ?"Textured — recommended if laying timber boards or tiles over slab"
+              :"Smooth — suitable for direct use, paint or sealer")
         )),
         card(React.createElement("div",null,
-          React.createElement("div",{style:{fontSize:13,fontWeight:600,marginBottom:8,color:"#555"}},"Options"),
-          React.createElement("label",{style:{display:"flex",gap:10,alignItems:"center",padding:"10px 0",cursor:"pointer"}},
+          React.createElement("div",{style:{fontSize:13,fontWeight:600,marginBottom:10,color:"#555"}},"Additional requirements"),
+          React.createElement("label",{style:{display:"flex",gap:10,alignItems:"center",padding:"8px 0",cursor:"pointer"}},
             React.createElement("input",{type:"checkbox",checked:form.concreteHasBal||false,
               onChange:ev=>upd("concreteHasBal",ev.target.checked),style:{width:16,height:16}}),
-            React.createElement("span",{style:{fontSize:14}},"Balustrade required (thickened edge beam)")
+            React.createElement("div",null,
+              React.createElement("div",{style:{fontSize:14}},"Balustrade"),
+              React.createElement("div",{style:{fontSize:11,color:"#aaa"}},"Adds 300x300mm thickened edge beam")
+            )
           ),
-          React.createElement("label",{style:{display:"flex",gap:10,alignItems:"center",padding:"10px 0",cursor:"pointer"}},
+          React.createElement("label",{style:{display:"flex",gap:10,alignItems:"center",padding:"8px 0",cursor:"pointer"}},
             React.createElement("input",{type:"checkbox",checked:form.concreteServices||false,
               onChange:ev=>upd("concreteServices",ev.target.checked),style:{width:16,height:16}}),
-            React.createElement("span",{style:{fontSize:14}},"Services required (conduit, drainage)")
-          ),
-          form.concreteHasBal&&warn("300×300mm thickened edge beam included for balustrade posts")
+            React.createElement("div",null,
+              React.createElement("div",{style:{fontSize:14}},"Services (conduit / drainage)"),
+              React.createElement("div",{style:{fontSize:11,color:"#aaa"}},"Measure on site")
+            )
+          )
         )),
-        React.createElement(PBtn,{label:"See my layout →",onClick:()=>go(4)}),
+        React.createElement(PBtn,{label:"Continue — Concrete base for timber deck →",onClick:()=>go(4)}),
+        React.createElement("button",{
+          onClick:()=>upd("projectType","Deck"),
+          style:{display:"block",width:"100%",padding:"14px",marginTop:8,
+            borderRadius:14,border:`1px solid ${BD}`,background:"white",
+            fontSize:14,fontWeight:500,color:"#555",cursor:"pointer"}
+        },"Switch to timber framed deck"),
         React.createElement(BackBtn,null)
       ),
 

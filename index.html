@@ -761,8 +761,7 @@ function App(){
         jeff("Your layout plan","Footing grid and board layout."),
 
         card((()=>{
-          // Draggable zones on mini deck footprint
-          const [drag,setDrag]=React.useState(null);
+          // Zone picker
           const miniW=220,miniH=Math.round(220*(parseFloat(form.width)||4)/(parseFloat(form.length)||5));
           const zonePositions={
             NW:{x:0,y:0},NE:{x:1,y:0},SW:{x:0,y:1},SE:{x:1,y:1},none:null
@@ -792,8 +791,7 @@ function App(){
                   background:"rgba(55,138,221,0.15)",border:"1.5px dashed #378ADD",
                   borderRadius:2,cursor:"grab",display:"flex",alignItems:"center",
                   justifyContent:"center",fontSize:10,color:"#185FA5",fontWeight:500},
-                onMouseDown:e=>{e.preventDefault();setDrag("alfresco");},
-                onTouchStart:e=>{e.preventDefault();setDrag("alfresco");}
+
               },"Alfresco"),
               // BBQ zone
               form.bbqZone!=="none"&&React.createElement("div",{
@@ -802,8 +800,7 @@ function App(){
                   background:"rgba(186,117,23,0.12)",border:"1.5px solid #BA7517",
                   borderRadius:2,cursor:"grab",display:"flex",alignItems:"center",
                   justifyContent:"center",fontSize:10,color:"#633806",fontWeight:500},
-                onMouseDown:e=>{e.preventDefault();setDrag("bbq");},
-                onTouchStart:e=>{e.preventDefault();setDrag("bbq");}
+
               },"BBQ")
             ),
             // Simple corner buttons as fallback (cleaner than drag for mobile)

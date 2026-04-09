@@ -706,11 +706,11 @@ function App(){
         card(React.createElement("div",null,
           React.createElement("div",{style:{fontSize:13,fontWeight:600,marginBottom:8,color:"#555"}},"Stairs"),
           React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7,marginBottom:form.stairType!=="none"?10:0}},
-            [["none","No stairs"],["standard","Standard"],["wide","Wide"],["landing","Inset"]].map(([k,l])=>
+            [["standard","Attached"],["landing","Inset"]].map(([k,l])=>
               React.createElement("button",{key:k,style:{padding:"10px",borderRadius:11,border:form.stairType===k?`2px solid ${Y}`:`1px solid ${BD}`,background:form.stairType===k?"#FFF9E6":"white",fontSize:13,fontWeight:form.stairType===k?700:400},
                 onClick:()=>{upd("stairType",k);if(k==="none")upd("stairWidthMm",0);else if(!form.stairWidthMm)upd("stairWidthMm",1200);}},l))
           ),
-          form.stairType!=="none"&&React.createElement("div",{style:{marginBottom:10}},
+          React.createElement("div",{style:{marginBottom:10}},
             React.createElement("div",{style:{fontSize:11,fontWeight:600,color:"#aaa",textTransform:"uppercase",letterSpacing:1,marginBottom:6}},"Stair face"),
             React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:6,marginBottom:10}},
               [["N","North"],["S","South"],["E","East"],["W","West"]].map(([k,l])=>
@@ -729,7 +729,7 @@ function App(){
                 )
             )
           ),
-          form.stairType!=="none"&&React.createElement("div",null,
+          React.createElement("div",null,
             React.createElement("div",{style:{display:"flex",gap:8,alignItems:"center"}},
               React.createElement("button",{style:{width:38,height:38,border:`1px solid ${BD}`,borderRadius:9,fontSize:18,background:"white"},
                 onClick:()=>upd("stairWidthMm",Math.max(900,Number(form.stairWidthMm)-100))},"-"),
@@ -848,7 +848,7 @@ function App(){
             deckingType:form.deckingType||"merbau",
             boardWidthMm:(BOARDS[form.deckingType]||BOARDS.merbau).w,
             balustradeType:form.balustradeType||"none",
-            hasStairs:form.stairType!=="none",
+            hasStairs:true, // stairs always present
             stairFace:form.layoutStairs||"S",
             stairWidthMm:Number(form.stairWidthMm)||1200,
             houseWall:form.houseWall||"bottom",
@@ -913,7 +913,7 @@ function App(){
             React.createElement("div",{style:{fontSize:10,fontWeight:600,color:"#888",
               textTransform:"uppercase",letterSpacing:1,marginBottom:8}},"Plan view"),
             React.createElement("div",{ref:ref=>{
-              if(!ref||ref._drawn)return; ref._drawn=true;
+              if(!ref)return; ref.innerHTML="";
               const svg=document.createElementNS(ns,"svg");
               svg.setAttribute("width","100%");
               svg.setAttribute("viewBox",`0 0 ${CVS_W} ${CVS_H}`);
@@ -1081,7 +1081,7 @@ function App(){
             deckingType:form.deckingType||"merbau",
             boardWidthMm:(BOARDS[form.deckingType]||BOARDS.merbau).w,
             balustradeType:form.balustradeType||"none",
-            hasStairs:form.stairType!=="none",
+            hasStairs:true, // stairs always present
             stairFace:form.layoutStairs||"S",
             stairWidthMm:Number(form.stairWidthMm)||1200,
             houseWall:form.houseWall||"bottom",
@@ -1140,7 +1140,7 @@ function App(){
             React.createElement("div",{style:{fontSize:10,fontWeight:600,color:"#888",
               textTransform:"uppercase",letterSpacing:1,marginBottom:8}},"Section A-A"),
             React.createElement("div",{ref:ref=>{
-              if(!ref||ref._drawn)return; ref._drawn=true;
+              if(!ref)return; ref.innerHTML="";
               const svg=document.createElementNS(ns,"svg");
               svg.setAttribute("width","100%");
               svg.setAttribute("viewBox",`0 0 ${CVS_W} ${CVS_H}`);

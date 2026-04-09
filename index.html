@@ -912,7 +912,10 @@ function App(){
           return React.createElement("div",null,
             React.createElement("div",{style:{fontSize:10,fontWeight:600,color:"#888",
               textTransform:"uppercase",letterSpacing:1,marginBottom:8}},"Plan view"),
-            React.createElement("div",{ref:ref=>{
+            React.createElement("div",{
+              key:`pv-${form.alfrescoZone}-${form.bbqZone}-${form.layoutStairs}-${form.stairType}-${form.houseWall}`,
+              key:`sect-${D.Dm}-${D.FFL}-${D.boardDir}-${D.stairFace}-${form.stairType}-${D.hasBal}`,
+              ref:ref=>{
               if(!ref)return; ref.innerHTML="";
               const svg=document.createElementNS(ns,"svg");
               svg.setAttribute("width","100%");

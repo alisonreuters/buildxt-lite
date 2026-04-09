@@ -588,8 +588,7 @@ function App(){
           onClick:()=>{
             if(form.projectType==="Deck"&&form.deckSupport==="concrete") upd("projectType","Concrete Slab");
             go(1);
-          },
-          disabled:!form.projectType||(form.projectType==="Deck"&&!form.deckSupport)
+          }
         }),
         React.createElement(BackBtn,null)
       ),

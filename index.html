@@ -633,6 +633,29 @@ screen===3&&(form.projectType==="Deck"||form.projectType==="Concrete Slab")&&Rea
       screen===4&&React.createElement("div",{className:"fade"},
         jeff("Tell me about the site and what you'd like"),
         card(React.createElement("div",null,
+          React.createElement("div",{style:{fontSize:13,fontWeight:600,marginBottom:10,color:"#555"}},"Deck dimensions"),
+          React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:4}},
+            React.createElement("div",null,
+              React.createElement("div",{style:{fontSize:11,color:"#aaa",marginBottom:4}},"Length (m)"),
+              React.createElement("input",{type:"number",value:form.length,
+                onChange:ev=>upd("length",ev.target.value),
+                style:{width:"100%",padding:"10px",borderRadius:10,border:`1px solid ${BD}`,fontSize:16,boxSizing:"border-box"}})
+            ),
+            React.createElement("div",null,
+              React.createElement("div",{style:{fontSize:11,color:"#aaa",marginBottom:4}},"Width (m)"),
+              React.createElement("input",{type:"number",value:form.width,
+                onChange:ev=>upd("width",ev.target.value),
+                style:{width:"100%",padding:"10px",borderRadius:10,border:`1px solid ${BD}`,fontSize:16,boxSizing:"border-box"}})
+            ),
+            React.createElement("div",null,
+              React.createElement("div",{style:{fontSize:11,color:"#aaa",marginBottom:4}},"Height (mm)"),
+              React.createElement("input",{type:"number",value:form.heightMm,
+                onChange:ev=>upd("heightMm",ev.target.value),
+                style:{width:"100%",padding:"10px",borderRadius:10,border:`1px solid ${BD}`,fontSize:16,boxSizing:"border-box"}})
+            )
+          )
+        )),
+        card(React.createElement("div",null,
           React.createElement("div",{style:{fontSize:13,fontWeight:600,marginBottom:8,color:"#555"}},"Site conditions"),
           React.createElement("div",{style:{display:"flex",gap:8,marginBottom:10}},
             [["flat","Flat","No excavation needed"],["work","Needs work","Some levelling required"]].map(([v,l,s])=>
@@ -679,7 +702,7 @@ screen===3&&(form.projectType==="Deck"||form.projectType==="Concrete Slab")&&Rea
             )
           )
         )),
-        form.deckLevel==="ground"&&jeff("Ground level deck","Pad footings bear on compacted ground. Min 75mm clearance between bearer and finished ground level. Good drainage essential — ensure no ponding under deck."),
+        form.projectType!=="Concrete Slab"&&form.deckLevel==="ground"&&jeff("Ground level deck","Pad footings bear on compacted ground. Min 75mm clearance between bearer and finished ground level. Good drainage essential — ensure no ponding under deck."),
         form.deckLevel==="raised"&&warn("Raised decks over 1800mm FFL require engineer certification and council approval. Jeff will calculate structure but you'll need stamped drawings before building."),
         card(React.createElement("div",null,
           React.createElement("div",{style:{fontSize:13,fontWeight:600,marginBottom:10,color:"#555"}},"Decking board"),
@@ -820,7 +843,7 @@ screen===3&&(form.projectType==="Deck"||form.projectType==="Concrete Slab")&&Rea
           form.concreteTop==="timber"&&React.createElement("div",{style:{
             background:"#FFF9E6",border:"1px solid #EFD080",borderRadius:10,padding:"10px 12px",fontSize:12,color:"#555"}},
             React.createElement("span",{style:{fontWeight:600,color:"#B8860B"}},"Jeff: "),
-            "70x35 hardwood battens drilled and plugged at 450mm ctrs. Use 50mm decking screws. Select your board type in the timber deck flow."
+            "75x35 hardwood battens drilled and plugged at 450mm ctrs. Use 50mm decking screws. Select your board type in the timber deck flow."
           )
         )),
         card(React.createElement("div",null,

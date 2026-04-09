@@ -913,15 +913,10 @@ function App(){
               const hl=hwLine[D.houseWall]||hwLine.bottom;
               add(e("line",{x1:hl[0],y1:hl[1],x2:hl[2],y2:hl[3],stroke:"#1a1a1a","stroke-width":"4"}));
 
-              // ── STAIR RECTANGLE ───────────────────────────────
-              // Rule: inset=solid outline inside deck, standard=dashed outside deck
-              if(sr){
+                            // ── STAIR RECTANGLE (standard only — drawn before deck outline) ──
+              if(sr&&!isInset){
                 add(e("rect",{x:sr.x,y:sr.y,width:sr.w,height:sr.h,
-                  fill:isInset?"#EDE8DF":"#F5F0E8",
-                  stroke:"#1a1a1a","stroke-width":isInset?"1.2":"0.8",
-                  "stroke-dasharray":isInset?"none":"4,3"}));
-                if(isInset) add(e("text",{x:sr.x+sr.w/2,y:sr.y+sr.h/2+3,
-                  fontSize:7,fill:"#888","text-anchor":"middle"},"inset stairs"));
+                  fill:"#F5F0E8",stroke:"#1a1a1a","stroke-width":"0.8","stroke-dasharray":"4,3"}));
                 const isNS=D.stairFace==="N"||D.stairFace==="S";
                 for(let i=1;i<D.stair.nRisers;i++){
                   const f=i/D.stair.nRisers;
@@ -959,6 +954,25 @@ function App(){
               bRowYs.forEach(by=>bColXs.forEach(bx=>{
                 add(e("circle",{cx:bx,cy:by,r:4,fill:"#1a1a1a",stroke:"white","stroke-width":"1.2"}));
               }));
+
+              // ── INSET STAIR (drawn last — on top of deck outline) ──
+              if(sr&&isInset){
+                add(e("rect",{x:sr.x,y:sr.y,width:sr.w,height:sr.h,
+                  fill:"#EDE8DF",stroke:"#1a1a1a","stroke-width":"1.2"}));
+                const isNS=D.stairFace==="N"||D.stairFace==="S";
+                for(let i=1;i<D.stair.nRisers;i++){
+                  const f=i/D.stair.nRisers;
+                  if(isNS){
+                    const ty=D.stairFace==="S"?sr.y+f*sr.h:sr.y+(1-f)*sr.h;
+                    add(e("line",{x1:sr.x,y1:ty,x2:sr.x+sr.w,y2:ty,stroke:"#bbb","stroke-width":"0.6"}));
+                  } else {
+                    const tx=D.stairFace==="E"?sr.x+f*sr.w:sr.x+(1-f)*sr.w;
+                    add(e("line",{x1:tx,y1:sr.y,x2:tx,y2:sr.y+sr.h,stroke:"#bbb","stroke-width":"0.6"}));
+                  }
+                }
+                add(e("text",{x:sr.x+sr.w/2,y:sr.y+sr.h/2+3,
+                  fontSize:7,fill:"#888","text-anchor":"middle"},"inset"));
+              }
 
               // ── ALFRESCO ZONE (if placed) ─────────────────────
               if(form.alfrescoZone&&form.alfrescoZone!=="none"){
@@ -1161,12 +1175,13 @@ function App(){
               const LPAD=OX+deckWpx+stRunPx+10;
               const lbls=[
                 {y:L.DK_TOP+L.DKpx/2,   t:"Decking",       s:null},
-                {y:L.JT_TOP+L.JTpx/2,   t:"Joist",         s:null},
                 {y:L.BR_TOP+L.BRpx/2,   t:"Bearer",        s:null},
                 {y:L.PIR_TOP+L.PIRpx/2, t:"Uni-Pier",      s:null},
                 {y:L.GY+L.PADpx/2,      t:"Pad footing",   s:null},
               ];
-              if(D.hasStairs) lbls.push({y:FFL_Y+(L.GY-FFL_Y)*0.35,t:"Stringer",s:null});
+              // Stringer above Joist — rule: stringer label near FFL, joist below decking
+              if(D.hasStairs) lbls.splice(1,0,{y:FFL_Y+(L.GY-FFL_Y)*0.25,t:"Stringer",s:null});
+              lbls.splice(D.hasStairs?2:1,0,{y:L.JT_TOP+L.JTpx/2,t:"Joist",s:null});
               if(D.hasBal) lbls.unshift({y:L.BAL_TOP+L.BALpx/2,t:"Balustrade",s:null});
               let lastY=-999;
               lbls.forEach(({y,t,s})=>{

@@ -427,7 +427,7 @@ function App(){
     length:"5.0",width:"4.0",siteCondition:"",deckLevel:"ground",
     heightMm:800,houseWall:"bottom",layoutBoard:"EW",layoutStairs:"S",layoutStairsFull:false,
     deckingType:"merbau",stairType:"standard",stairWidthMm:1200,
-    balustradeType:"none",poolAdjacent:false,alfrescoZone:"none",bbqZone:"none"
+    balustradeType:"none",poolAdjacent:false,alfrescoZone:"none",bbqZone:"none",concreteFinish:"trowel",concreteHasBal:false,concreteServices:false
   });
   const [errors,setErrors]=useState({});
   const upd=(k,v)=>setForm(p=>({...p,[k]:v}));
@@ -516,7 +516,7 @@ function App(){
     {key:"wire",label:"Wire tension"},
     {key:"rendered",label:"Rendered panel"},
   ];
-  const PROJECT_TYPES=["Deck","Pergola","Cabana","Gazebo","Shed","Carport","Garage","Extension","Renovation"];
+  const PROJECT_TYPES=["Deck","Concrete Slab","Pergola","Cabana","Gazebo","Shed","Carport","Garage","Extension","Renovation"];
 
   return React.createElement("div",{style:{background:BG,minHeight:"100vh"}},
     React.createElement("div",{style:{maxWidth:440,margin:"0 auto",padding:"0 16px 48px"}},
@@ -582,7 +582,7 @@ function App(){
       ),
 
 // ── SCREEN 3: Deck position ───────────────────────────────────
-      screen===3&&form.projectType==="Deck"&&React.createElement("div",{className:"fade"},
+      screen===3&&(form.projectType==="Deck"||form.projectType==="Concrete Slab")&&React.createElement("div",{className:"fade"},
         jeff("Where does your deck sit?","Tap to place it relative to the house."),
         card(React.createElement("div",{style:{display:"flex",flexDirection:"column",alignItems:"center",gap:12}},
           React.createElement("div",{style:{position:"relative",width:240,height:240,margin:"0 auto"}},
@@ -756,6 +756,59 @@ function App(){
         screen===4&&React.createElement(BackBtn,null)
       ),
 
+      // ── SCREEN 4: Concrete Slab spec ───────────────────────
+      screen===4&&form.projectType==="Concrete Slab"&&React.createElement("div",{className:"fade"},
+        jeff("Your concrete slab","Tell Jeff about the slab so he can calculate materials."),
+        card(React.createElement("div",null,
+          React.createElement("div",{style:{fontSize:13,fontWeight:600,marginBottom:8,color:"#555"}},"Dimensions"),
+          React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}},
+            React.createElement("div",null,
+              React.createElement("div",{style:{fontSize:11,color:"#aaa",marginBottom:4}},"Length (m)"),
+              React.createElement("input",{type:"number",value:form.length,
+                onChange:ev=>upd("length",ev.target.value),
+                style:{width:"100%",padding:"10px",borderRadius:10,border:`1px solid ${BD}`,fontSize:16}})
+            ),
+            React.createElement("div",null,
+              React.createElement("div",{style:{fontSize:11,color:"#aaa",marginBottom:4}},"Width (m)"),
+              React.createElement("input",{type:"number",value:form.width,
+                onChange:ev=>upd("width",ev.target.value),
+                style:{width:"100%",padding:"10px",borderRadius:10,border:`1px solid ${BD}`,fontSize:16}})
+            )
+          )
+        )),
+        card(React.createElement("div",null,
+          React.createElement("div",{style:{fontSize:13,fontWeight:600,marginBottom:8,color:"#555"}},"Finish"),
+          React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}},
+            [["trowel","Steel trowel"],["broom","Broom finish"],["float","Wood float"]].map(([k,l])=>
+              React.createElement("button",{key:k,onClick:()=>upd("concreteFinish",k),
+                style:{padding:"10px",borderRadius:11,fontSize:13,fontWeight:form.concreteFinish===k?700:400,
+                  border:form.concreteFinish===k?`2px solid ${Y}`:`1px solid ${BD}`,
+                  background:form.concreteFinish===k?"#FFF9E6":"white",cursor:"pointer"}},l)
+            )
+          ),
+          React.createElement("div",{style:{fontSize:11,color:"#aaa",marginTop:8}},
+            form.concreteFinish==="trowel"?"Smooth — suitable for direct use or painting":
+            form.concreteFinish==="broom"?"Textured — recommended if tiling over slab":
+            "Open texture — good tile adhesion")
+        )),
+        card(React.createElement("div",null,
+          React.createElement("div",{style:{fontSize:13,fontWeight:600,marginBottom:8,color:"#555"}},"Options"),
+          React.createElement("label",{style:{display:"flex",gap:10,alignItems:"center",padding:"10px 0",cursor:"pointer"}},
+            React.createElement("input",{type:"checkbox",checked:form.concreteHasBal||false,
+              onChange:ev=>upd("concreteHasBal",ev.target.checked),style:{width:16,height:16}}),
+            React.createElement("span",{style:{fontSize:14}},"Balustrade required (thickened edge beam)")
+          ),
+          React.createElement("label",{style:{display:"flex",gap:10,alignItems:"center",padding:"10px 0",cursor:"pointer"}},
+            React.createElement("input",{type:"checkbox",checked:form.concreteServices||false,
+              onChange:ev=>upd("concreteServices",ev.target.checked),style:{width:16,height:16}}),
+            React.createElement("span",{style:{fontSize:14}},"Services required (conduit, drainage)")
+          ),
+          form.concreteHasBal&&warn("300×300mm thickened edge beam included for balustrade posts")
+        )),
+        React.createElement(PBtn,{label:"See my layout →",onClick:()=>go(4)}),
+        React.createElement(BackBtn,null)
+      ),
+
       // ── SCREEN 5: Layout plan ───────────────────────────────────
       screen===5&&React.createElement("div",{className:"fade"},
         jeff("Your layout plan","Footing grid and board layout."),
@@ -789,19 +842,29 @@ function App(){
           )
         )),
         card((()=>{
-          const R=calcDeck({
-            Lm:parseFloat(form.length)||5,
-            Dm:parseFloat(form.width)||4,
-            FFL:Number(form.heightMm)||300,
-            boardDir:form.layoutBoard||"EW",
-            deckingType:form.deckingType||"merbau",
-            boardWidthMm:(BOARDS[form.deckingType]||BOARDS.merbau).w,
-            balustradeType:form.balustradeType||"none",
-            hasStairs:true, // stairs always present
-            stairFace:form.layoutStairs||"S",
-            stairWidthMm:Number(form.stairWidthMm)||1200,
-            houseWall:form.houseWall||"bottom",
-          });
+          const isConcrete=form.projectType==="Concrete Slab";
+          const R=isConcrete
+            ? calcConcreteSlab({
+                Lm:parseFloat(form.length)||5,
+                Dm:parseFloat(form.width)||4,
+                hasBal:form.concreteHasBal||false,
+                finish:form.concreteFinish||"trowel",
+                hasServices:form.concreteServices||false,
+                houseWall:form.houseWall||"bottom",
+              })
+            : calcDeck({
+                Lm:parseFloat(form.length)||5,
+                Dm:parseFloat(form.width)||4,
+                FFL:Number(form.heightMm)||300,
+                boardDir:form.layoutBoard||"EW",
+                deckingType:form.deckingType||"merbau",
+                boardWidthMm:(BOARDS[form.deckingType]||BOARDS.merbau).w,
+                balustradeType:form.balustradeType||"none",
+                hasStairs:true,
+                stairFace:form.layoutStairs||"S",
+                stairWidthMm:Number(form.stairWidthMm)||1200,
+                houseWall:form.houseWall||"bottom",
+              });
           const D=R.draw;
 
           // ── FIXED CANVAS & PLACEHOLDER ZONES ─────────────────
@@ -1026,19 +1089,29 @@ function App(){
       screen===6&&React.createElement("div",{className:"fade"},
         jeff("Section A-A","Calculated from your inputs."),
         card((()=>{
-          const R=calcDeck({
-            Lm:parseFloat(form.length)||5,
-            Dm:parseFloat(form.width)||4,
-            FFL:Number(form.heightMm)||300,
-            boardDir:form.layoutBoard||"EW",
-            deckingType:form.deckingType||"merbau",
-            boardWidthMm:(BOARDS[form.deckingType]||BOARDS.merbau).w,
-            balustradeType:form.balustradeType||"none",
-            hasStairs:true, // stairs always present
-            stairFace:form.layoutStairs||"S",
-            stairWidthMm:Number(form.stairWidthMm)||1200,
-            houseWall:form.houseWall||"bottom",
-          });
+          const isConcrete=form.projectType==="Concrete Slab";
+          const R=isConcrete
+            ? calcConcreteSlab({
+                Lm:parseFloat(form.length)||5,
+                Dm:parseFloat(form.width)||4,
+                hasBal:form.concreteHasBal||false,
+                finish:form.concreteFinish||"trowel",
+                hasServices:form.concreteServices||false,
+                houseWall:form.houseWall||"bottom",
+              })
+            : calcDeck({
+                Lm:parseFloat(form.length)||5,
+                Dm:parseFloat(form.width)||4,
+                FFL:Number(form.heightMm)||300,
+                boardDir:form.layoutBoard||"EW",
+                deckingType:form.deckingType||"merbau",
+                boardWidthMm:(BOARDS[form.deckingType]||BOARDS.merbau).w,
+                balustradeType:form.balustradeType||"none",
+                hasStairs:true,
+                stairFace:form.layoutStairs||"S",
+                stairWidthMm:Number(form.stairWidthMm)||1200,
+                houseWall:form.houseWall||"bottom",
+              });
           const D=R.draw;
           const SC=0.1;
 

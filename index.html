@@ -730,7 +730,7 @@ function App(){
         card(React.createElement("div",null,
           React.createElement("div",{style:{fontSize:13,fontWeight:600,marginBottom:8,color:"#555"}},"Stairs"),
           React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7,marginBottom:form.stairType!=="none"?10:0}},
-            [["none","No stairs"],["standard","Standard"],["wide","Wide"],["landing","With landing"]].map(([k,l])=>
+            [["none","No stairs"],["standard","Standard"],["wide","Wide"],["landing","Inset"]].map(([k,l])=>
               React.createElement("button",{key:k,style:{padding:"10px",borderRadius:11,border:form.stairType===k?`2px solid ${Y}`:`1px solid ${BD}`,background:form.stairType===k?"#FFF9E6":"white",fontSize:13,fontWeight:form.stairType===k?700:400},
                 onClick:()=>{upd("stairType",k);if(k==="none")upd("stairWidthMm",0);else if(!form.stairWidthMm)upd("stairWidthMm",1200);}},l))
           ),
@@ -825,6 +825,7 @@ function App(){
             E:{x:isInset?OX+deckWpx-stRunPx:OX+deckWpx, y:OY+(deckDpx-stWpx)/2, w:stRunPx, h:stWpx},
             W:{x:isInset?OX:OX-stRunPx, y:OY+(deckDpx-stWpx)/2, w:stRunPx, h:stWpx},
           };
+          const isInset=form.stairType==="landing";
           const sr=D.hasStairs?(stairRects[D.stairFace]||stairRects.S):null;
 
           // Fixed placeholder positions
@@ -914,9 +915,14 @@ function App(){
               add(e("line",{x1:hl[0],y1:hl[1],x2:hl[2],y2:hl[3],stroke:"#1a1a1a","stroke-width":"4"}));
 
               // ── STAIR RECTANGLE ───────────────────────────────
+              // Rule: inset=solid outline inside deck, standard=dashed outside deck
               if(sr){
                 add(e("rect",{x:sr.x,y:sr.y,width:sr.w,height:sr.h,
-                  fill:"#F5F0E8",stroke:"#1a1a1a","stroke-width":"0.8","stroke-dasharray":"4,3"}));
+                  fill:isInset?"#EDE8DF":"#F5F0E8",
+                  stroke:"#1a1a1a","stroke-width":isInset?"1.2":"0.8",
+                  "stroke-dasharray":isInset?"none":"4,3"}));
+                if(isInset) add(e("text",{x:sr.x+sr.w/2,y:sr.y+sr.h/2+3,
+                  fontSize:7,fill:"#888","text-anchor":"middle"},"inset stairs"));
                 const isNS=D.stairFace==="N"||D.stairFace==="S";
                 for(let i=1;i<D.stair.nRisers;i++){
                   const f=i/D.stair.nRisers;
@@ -1027,7 +1033,23 @@ function App(){
           const OX=ML;
           const nBRows=R.nBearerRows;
           const pierXs=Array.from({length:nBRows},(_,i)=>OX+(i/Math.max(1,nBRows-1))*deckWpx);
-          const stair=D.hasStairs?stairComponent(D,SC,OX+deckWpx,FFL_Y,L.GY):null;
+          // Stair visibility rule in section A-A:
+          // Section cuts perpendicular to board direction
+          // EW boards → section is NS cut → looking East or West
+          // Stairs appear in THIS section only if on E or W face
+          // NS boards → section is EW cut → stairs appear if on N or S face
+          const stairInSection=(()=>{
+            if(!D.hasStairs) return false;
+            const cutDir=D.sectionCutDir; // "NS" or "EW"
+            const face=D.stairFace;
+            if(cutDir==="NS") return face==="E"||face==="W";
+            return face==="N"||face==="S";
+          })();
+          // Stair projects from RIGHT side of section drawing
+          // For inset stairs, stair starts inside deck not at edge
+          const isInset=form.stairType==="landing";
+          const stairOriginX=isInset?OX+deckWpx-D.hasStairs&&stair?D.stair.stairRun*SC:0:OX+deckWpx;
+          const stair=stairInSection?stairComponent(D,SC,OX+deckWpx,FFL_Y,L.GY):null;
 
           const ns="http://www.w3.org/2000/svg";
           const e=(tag,attrs,txt)=>{
@@ -1103,11 +1125,17 @@ function App(){
                 add(e("rect",{x:OX-pw2,y:FFL_Y+2,width:deckWpx+pw2*2,height:4,fill:"#F5F0E8",stroke:"#1a1a1a","stroke-width":"0.7"}));
               }
 
-              // Stringer
+              // Stringer — only drawn if stair face aligns with section cut
               if(stair){
                 add(e("polygon",{points:stair.poly,fill:"#F5F0E8",stroke:"#1a1a1a","stroke-width":"0.9"}));
                 stair.treads.forEach(t=>add(e("rect",{x:t.x,y:t.y,width:t.w,height:t.h,fill:"#F5F0E8",stroke:"#1a1a1a","stroke-width":"0.7"})));
                 add(e("rect",{x:stair.padX,y:stair.padY,width:stair.padW,height:stair.padH,fill:"#E8E8E8",stroke:"#1a1a1a","stroke-width":"0.7"}));
+              } else if(D.hasStairs){
+                // Stairs exist but on a different face — note on drawing
+                add(e("text",{x:OX+deckWpx+8,y:FFL_Y+20,fontSize:7,fill:"#aaa"},
+                  `Stairs ${D.stairFace} face`));
+                add(e("text",{x:OX+deckWpx+8,y:FFL_Y+30,fontSize:7,fill:"#aaa"},
+                  "see elevation"));
               }
 
               // ── LEFT DIMS — numbers only, no "mm", no duplication ──

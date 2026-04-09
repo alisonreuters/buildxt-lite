@@ -316,7 +316,7 @@ function structRules(L,D,hmm,hasBal,boardDir){
   const joistLmTotal=Math.ceil(nJoists*joistSpan);
 
   // Stair riser — ceil(hmm/180) guarantees riser never exceeds 180mm (AS1657)
-  const nSteps=hmm>0?Math.ceil(hmm/180):0;
+  const nSteps=Math.max(1,Math.ceil(hmm/180));
   const riser=nSteps>0?Math.round(hmm/nSteps):160;
 
   return{
@@ -749,7 +749,7 @@ function App(){
                 }},"+")
             ),
             React.createElement("div",{style:{fontSize:11,color:"#888",marginTop:6,textAlign:"center"}},
-              `${est.rules.nSteps} risers @ ${est.rules.riser}mm · 300mm going · stair run ${est.rules.nSteps*300}mm · max width ${Math.round(parseFloat(form.length)*1000)}mm`)
+              `${est.rules.nSteps} ${est.rules.nSteps===1?"step":"risers"} at ${est.rules.riser}mm, 300mm going, run ${est.rules.nSteps*300}mm`)
           )
         )),
         screen===4&&React.createElement(PBtn,{label:"See my layout →",onClick:()=>go(5)}),

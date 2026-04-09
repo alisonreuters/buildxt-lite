@@ -635,25 +635,27 @@ screen===3&&(form.projectType==="Deck"||form.projectType==="Concrete Slab")&&Rea
         card(React.createElement("div",null,
           React.createElement("div",{style:{fontSize:13,fontWeight:600,marginBottom:10,color:"#555"}},"Deck dimensions"),
           React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:4}},
-            React.createElement("div",null,
-              React.createElement("div",{style:{fontSize:11,color:"#aaa",marginBottom:4}},"Length (m)"),
-              React.createElement("input",{type:"number",value:form.length,
-                onChange:ev=>upd("length",ev.target.value),
-                style:{width:"100%",padding:"10px",borderRadius:10,border:`1px solid ${BD}`,fontSize:16,boxSizing:"border-box"}})
-            ),
-            React.createElement("div",null,
-              React.createElement("div",{style:{fontSize:11,color:"#aaa",marginBottom:4}},"Width (m)"),
-              React.createElement("input",{type:"number",value:form.width,
-                onChange:ev=>upd("width",ev.target.value),
-                style:{width:"100%",padding:"10px",borderRadius:10,border:`1px solid ${BD}`,fontSize:16,boxSizing:"border-box"}})
+            [["length","Length (m)","5.0"],["width","Width (m)","4.0"]].map(([k,lbl,ph])=>
+              React.createElement("div",{key:k},
+                React.createElement("div",{style:{fontSize:11,color:"#aaa",marginBottom:4}},lbl),
+                React.createElement("input",{type:"text",inputMode:"decimal",value:form[k],placeholder:ph,
+                  onChange:ev=>upd(k,ev.target.value),
+                  onBlur:ev=>{const v=parseFloat(ev.target.value);if(!isNaN(v))upd(k,(Math.round(v*10)/10).toFixed(1));},
+                  style:{width:"100%",padding:"10px",borderRadius:10,border:`1px solid ${BD}`,
+                    fontSize:16,boxSizing:"border-box",WebkitAppearance:"none"}})
+              )
             ),
             React.createElement("div",null,
               React.createElement("div",{style:{fontSize:11,color:"#aaa",marginBottom:4}},"Height (mm)"),
-              React.createElement("input",{type:"number",value:form.heightMm,
+              React.createElement("input",{type:"text",inputMode:"numeric",value:form.heightMm,placeholder:"300",
                 onChange:ev=>upd("heightMm",ev.target.value),
-                style:{width:"100%",padding:"10px",borderRadius:10,border:`1px solid ${BD}`,fontSize:16,boxSizing:"border-box"}})
+                onBlur:ev=>{const v=parseInt(ev.target.value);if(!isNaN(v))upd("heightMm",Math.round(v/50)*50||50);},
+                style:{width:"100%",padding:"10px",borderRadius:10,border:`1px solid ${BD}`,
+                  fontSize:16,boxSizing:"border-box",WebkitAppearance:"none"}})
             )
-          )
+          ),
+          React.createElement("div",{style:{fontSize:11,color:"#aaa",marginTop:6}},
+            `Area: ${((parseFloat(form.length)||0)*(parseFloat(form.width)||0)).toFixed(1)}m²`)
         )),
         card(React.createElement("div",null,
           React.createElement("div",{style:{fontSize:13,fontWeight:600,marginBottom:8,color:"#555"}},"Site conditions"),
@@ -710,7 +712,7 @@ screen===3&&(form.projectType==="Deck"||form.projectType==="Concrete Slab")&&Rea
             background:"#FFF9E6",border:"1px solid #EFD080",borderRadius:10,
             padding:"10px 12px",marginBottom:10,fontSize:12,color:"#555"}},
             React.createElement("span",{style:{fontWeight:600,color:"#B8860B"}},"Jeff: "),
-            "Timber boards on concrete require 70×45 hardwood battens drilled and plugged into slab at 450mm ctrs. Use 50mm decking screws (not standard 65mm). Allow for batten material and fixing cost."
+            "Timber boards on concrete require 75×35 hardwood timber grounds drilled and plugged into slab at 450mm ctrs. Use 50mm decking screws (not standard 65mm). Allow for batten and fixing cost."
           ),
           boardGroups.map(({group,keys})=>React.createElement("div",{key:group,style:{marginBottom:12}},
             React.createElement("div",{style:{fontSize:11,fontWeight:600,color:"#bbb",textTransform:"uppercase",letterSpacing:1,marginBottom:6}},group),
@@ -810,21 +812,19 @@ screen===3&&(form.projectType==="Deck"||form.projectType==="Concrete Slab")&&Rea
 
       // ── SCREEN 4: Concrete Slab — integrated Jeff flow ──────
       screen===4&&form.projectType==="Concrete Slab"&&React.createElement("div",{className:"fade"},
-        jeff("Concrete slab","100mm N25 slab on compacted ground — Jeff calculates your materials."),
+        jeff("Your slab","100mm N25 on compacted ground — Jeff calculates your materials."),
         card(React.createElement("div",null,
           React.createElement("div",{style:{fontSize:13,fontWeight:600,marginBottom:8,color:"#555"}},"Dimensions"),
           React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:4}},
-            React.createElement("div",null,
-              React.createElement("div",{style:{fontSize:11,color:"#aaa",marginBottom:4}},"Length (m)"),
-              React.createElement("input",{type:"number",value:form.length,
-                onChange:ev=>upd("length",ev.target.value),
-                style:{width:"100%",padding:"10px",borderRadius:10,border:`1px solid ${BD}`,fontSize:16}})
-            ),
-            React.createElement("div",null,
-              React.createElement("div",{style:{fontSize:11,color:"#aaa",marginBottom:4}},"Width (m)"),
-              React.createElement("input",{type:"number",value:form.width,
-                onChange:ev=>upd("width",ev.target.value),
-                style:{width:"100%",padding:"10px",borderRadius:10,border:`1px solid ${BD}`,fontSize:16}})
+            [["length","Length (m)","5.0"],["width","Width (m)","4.0"]].map(([k,lbl,ph])=>
+              React.createElement("div",{key:k},
+                React.createElement("div",{style:{fontSize:11,color:"#aaa",marginBottom:4}},lbl),
+                React.createElement("input",{type:"text",inputMode:"decimal",value:form[k],placeholder:ph,
+                  onChange:ev=>upd(k,ev.target.value),
+                  onBlur:ev=>{const v=parseFloat(ev.target.value);if(!isNaN(v))upd(k,(Math.round(v*10)/10).toFixed(1));},
+                  style:{width:"100%",padding:"10px",borderRadius:10,border:`1px solid ${BD}`,
+                    fontSize:16,boxSizing:"border-box",WebkitAppearance:"none"}})
+              )
             )
           ),
           React.createElement("div",{style:{fontSize:11,color:"#aaa",marginTop:6}},
@@ -843,7 +843,7 @@ screen===3&&(form.projectType==="Deck"||form.projectType==="Concrete Slab")&&Rea
           form.concreteTop==="timber"&&React.createElement("div",{style:{
             background:"#FFF9E6",border:"1px solid #EFD080",borderRadius:10,padding:"10px 12px",fontSize:12,color:"#555"}},
             React.createElement("span",{style:{fontWeight:600,color:"#B8860B"}},"Jeff: "),
-            "75x35 hardwood battens drilled and plugged at 450mm ctrs. Use 50mm decking screws. Select your board type in the timber deck flow."
+            "75×35 hardwood timber grounds drilled and plugged into slab at 450mm ctrs. Use 50mm decking screws. Select your board type."
           )
         )),
         card(React.createElement("div",null,

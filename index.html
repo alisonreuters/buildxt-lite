@@ -427,7 +427,7 @@ function App(){
     length:"5.0",width:"4.0",siteCondition:"",deckLevel:"ground",
     heightMm:800,houseWall:"bottom",layoutBoard:"EW",layoutStairs:"S",layoutStairsFull:false,
     deckingType:"merbau",stairType:"standard",stairWidthMm:1200,
-    balustradeType:"none",poolAdjacent:false,alfrescoZone:"none",bbqZone:"none",concreteFinish:"trowel",concreteTop:"bare",concreteHasBal:false,concreteServices:false
+    balustradeType:"none",poolAdjacent:false,alfrescoZone:"none",bbqZone:"none",concreteFinish:"trowel",concreteTop:"bare",concreteHasBal:false,concreteServices:false,balFixing:"side"
   });
   const [errors,setErrors]=useState({});
   const upd=(k,v)=>setForm(p=>({...p,[k]:v}));
@@ -711,6 +711,21 @@ function App(){
             form.poolAdjacent&&warn("Pool fence rules apply (AS1926.1) — 1200mm min height, self-closing gate required. Confirm with your certifier.")
           )
         )),
+        form.balustradeType!=="none"&&card(React.createElement("div",null,
+          React.createElement("div",{style:{fontSize:13,fontWeight:600,marginBottom:10,color:"#555"}},"Balustrade fixing"),
+          React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}},
+            [["side","Side fixed"],["top","Top fixed"]].map(([k,l])=>
+              React.createElement("button",{key:k,onClick:()=>upd("balFixing",k),
+                style:{padding:"12px",borderRadius:11,fontSize:13,fontWeight:form.balFixing===k?700:400,
+                  border:form.balFixing===k?`2px solid ${Y}`:`1px solid ${BD}`,
+                  background:form.balFixing===k?"#FFF9E6":"white",cursor:"pointer"}},l)
+              )
+          ),
+          React.createElement("div",{style:{fontSize:11,color:"#aaa",marginTop:8}},
+            form.balFixing==="side"
+              ?"Posts bolt to face of joist or bearer — cleaner deck surface, no penetrations through decking"
+              :"Posts fix through decking into joist — standard method, requires solid blocking between joists")
+        )),
         card(React.createElement("div",null,
           React.createElement("div",{style:{fontSize:13,fontWeight:600,marginBottom:8,color:"#555"}},"Stairs"),
           React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7,marginBottom:form.stairType!=="none"?10:0}},
@@ -825,6 +840,17 @@ function App(){
             React.createElement("div",null,
               React.createElement("div",{style:{fontSize:14}},"Balustrade"),
               React.createElement("div",{style:{fontSize:11,color:"#aaa"}},"Adds 300x300mm thickened edge beam")
+            )
+          ),
+          form.concreteHasBal&&React.createElement("div",{style:{marginLeft:26,marginTop:4}},
+            React.createElement("div",{style:{fontSize:12,color:"#888",marginBottom:6}},"Fixing method"),
+            React.createElement("div",{style:{display:"flex",gap:8}},
+              [["side","Side fixed"],["top","Top fixed"]].map(([k,l])=>
+                React.createElement("button",{key:k,onClick:()=>upd("balFixing",k),
+                  style:{flex:1,padding:"8px",borderRadius:9,fontSize:12,fontWeight:form.balFixing===k?700:400,
+                    border:form.balFixing===k?`2px solid ${Y}`:`1px solid ${BD}`,
+                    background:form.balFixing===k?"#FFF9E6":"white",cursor:"pointer"}},l)
+              )
             )
           ),
           React.createElement("label",{style:{display:"flex",gap:10,alignItems:"center",padding:"8px 0",cursor:"pointer"}},

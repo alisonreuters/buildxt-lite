@@ -772,10 +772,14 @@ function App(){
             return ["NW","NE","SW","SE"][[0,1,2,3].find(i=>[0,1,0,1][i]===nx&&[0,0,1,1][i]===ny)];
           };
 
-          const alfPos=zonePositions[form.alfrescoZone]||{x:0,y:1};
-          const bbqPos=zonePositions[form.bbqZone]||{x:1,y:1};
-          const alfPx={x:alfPos.x*(miniW*0.55),y:alfPos.y*(miniH*0.55)};
-          const bbqPx={x:bbqPos.x*(miniW*0.7),y:bbqPos.y*(miniH*0.7)};
+          const alfPos=zonePositions[form.alfrescoZone]||null;
+          const bbqPos=zonePositions[form.bbqZone]||null;
+          // Zone sizes as fraction of mini deck
+          const alfW=miniW*0.48, alfH=miniH*0.48;
+          const bbqW=miniW*0.26, bbqH=miniH*0.26;
+          // Position: x=0→left edge, x=1→right edge (accounting for zone width)
+          const alfPx=alfPos?{x:alfPos.x*(miniW-alfW),y:alfPos.y*(miniH-alfH)}:{x:0,y:miniH-alfH};
+          const bbqPx=bbqPos?{x:bbqPos.x*(miniW-bbqW),y:bbqPos.y*(miniH-bbqH)}:{x:miniW-bbqW,y:miniH-bbqH};
 
           return React.createElement("div",null,
             React.createElement("div",{style:{fontSize:11,fontWeight:600,color:"#aaa",textTransform:"uppercase",letterSpacing:1,marginBottom:10}},"Deck zones"),
@@ -787,7 +791,7 @@ function App(){
               // Alfresco zone
               form.alfrescoZone!=="none"&&React.createElement("div",{
                 style:{position:"absolute",left:alfPx.x,top:alfPx.y,
-                  width:miniW*0.48,height:miniH*0.48,
+                  width:alfW,height:alfH,
                   background:"rgba(55,138,221,0.15)",border:"1.5px dashed #378ADD",
                   borderRadius:2,cursor:"grab",display:"flex",alignItems:"center",
                   justifyContent:"center",fontSize:10,color:"#185FA5",fontWeight:500},
@@ -796,7 +800,7 @@ function App(){
               // BBQ zone
               form.bbqZone!=="none"&&React.createElement("div",{
                 style:{position:"absolute",left:bbqPx.x,top:bbqPx.y,
-                  width:miniW*0.28,height:miniH*0.28,
+                  width:bbqW,height:bbqH,
                   background:"rgba(186,117,23,0.12)",border:"1.5px solid #BA7517",
                   borderRadius:2,cursor:"grab",display:"flex",alignItems:"center",
                   justifyContent:"center",fontSize:10,color:"#633806",fontWeight:500},
@@ -811,7 +815,7 @@ function App(){
                   [["none","—"],["NW","NW"],["NE","NE"],["SW","SW"],["SE","SE"]].map(([k,l])=>
                     React.createElement("button",{key:k,
                       onClick:()=>upd("alfrescoZone",k),
-                      style:{padding:"6px 2px",borderRadius:6,fontSize:11,cursor:"pointer",
+                      style:{padding:"10px 2px",borderRadius:8,fontSize:12,cursor:"pointer",
                         
                         border:form.alfrescoZone===k?"2px solid #378ADD":"1px solid #e5e5e5",
                         background:form.alfrescoZone===k?"#E6F1FB":"white"}},l)
@@ -824,7 +828,7 @@ function App(){
                   [["none","—"],["NW","NW"],["NE","NE"],["SW","SW"],["SE","SE"]].map(([k,l])=>
                     React.createElement("button",{key:k,
                       onClick:()=>upd("bbqZone",k),
-                      style:{padding:"6px 2px",borderRadius:6,fontSize:11,cursor:"pointer",
+                      style:{padding:"10px 2px",borderRadius:8,fontSize:12,cursor:"pointer",
                         
                         border:form.bbqZone===k?"2px solid #BA7517":"1px solid #e5e5e5",
                         background:form.bbqZone===k?"#FAEEDA":"white"}},l)
@@ -1264,7 +1268,8 @@ function App(){
               // Bottom dims — metres
               const dimY=L.GY+L.PADpx+16;
               [[OX,OX+deckWpx,`${D.Dm}m`],
-               ...(D.hasStairs?[[OX+deckWpx,OX+deckWpx+stRunPx,`${(D.stair.stairRun/1000).toFixed(1)}m`]]:[])
+               // Only show stair run dim if stairs appear in THIS section
+               ...(stairInSection&&stair?[[OX+deckWpx,OX+deckWpx+stRunPx,`${(D.stair.stairRun/1000).toFixed(1)}m`]]:[])
               ].forEach(([x1,x2,lbl])=>{
                 add(e("line",{x1,y1:dimY,x2,y2:dimY,stroke:"#555","stroke-width":"0.6"}));
                 add(e("line",{x1,y1:dimY-3,x2:x1,y2:dimY+3,stroke:"#555","stroke-width":"0.6"}));

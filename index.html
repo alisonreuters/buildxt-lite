@@ -815,11 +815,15 @@ function App(){
           // Stair — fits inside drawing zone, scaled same as deck
           const stRunPx=D.hasStairs?D.stair.stairRun*SC:0;
           const stWpx=D.hasStairs?Math.min(D.stairWidthMm*SC, deckWpx*0.6):0;
+          // Stair position rule:
+          // standard/wide = projects OUTSIDE deck perimeter
+          // landing = set back INSIDE deck perimeter (inset stair)
+          const isInset=form.stairType==="landing";
           const stairRects={
-            N:{x:OX+(deckWpx-stWpx)/2, y:OY-stRunPx,    w:stWpx,   h:stRunPx},
-            S:{x:OX+(deckWpx-stWpx)/2, y:OY+deckDpx,    w:stWpx,   h:stRunPx},
-            E:{x:OX+deckWpx,           y:OY+(deckDpx-stWpx)/2, w:stRunPx, h:stWpx},
-            W:{x:OX-stRunPx,           y:OY+(deckDpx-stWpx)/2, w:stRunPx, h:stWpx},
+            N:{x:OX+(deckWpx-stWpx)/2, y:isInset?OY:OY-stRunPx, w:stWpx, h:stRunPx},
+            S:{x:OX+(deckWpx-stWpx)/2, y:isInset?OY+deckDpx-stRunPx:OY+deckDpx, w:stWpx, h:stRunPx},
+            E:{x:isInset?OX+deckWpx-stRunPx:OX+deckWpx, y:OY+(deckDpx-stWpx)/2, w:stRunPx, h:stWpx},
+            W:{x:isInset?OX:OX-stRunPx, y:OY+(deckDpx-stWpx)/2, w:stRunPx, h:stWpx},
           };
           const sr=D.hasStairs?(stairRects[D.stairFace]||stairRects.S):null;
 
@@ -855,8 +859,7 @@ function App(){
 
               // ── TOP ZONE ─────────────────────────────────────
               // Title — top left
-              add(e("text",{x:ZONE_LFT,y:12,fontSize:6.5,fill:"#ccc"},
-                `Plan view · ${D.Lm}m × ${D.Dm}m · FFL ${D.FFL}mm`));
+              // No title line — rule: plan view is self-explanatory with dims
               // N label — tight to top of deck
               add(e("text",{x:midX,y:OY-3,fontSize:7,fill:"#ddd","text-anchor":"middle"},"N"));
               // A circle top — below N
@@ -1131,7 +1134,7 @@ function App(){
               // Rule: one label per member, stacked with min 20px gap
               const LPAD=OX+deckWpx+stRunPx+10;
               const lbls=[
-                {y:L.DK_TOP+L.DKpx/2,   t:"Decking",       s:D.boardDir+" boards"},
+                {y:L.DK_TOP+L.DKpx/2,   t:"Decking",       s:null},
                 {y:L.JT_TOP+L.JTpx/2,   t:"Joist",         s:null},
                 {y:L.BR_TOP+L.BRpx/2,   t:"Bearer",        s:null},
                 {y:L.PIR_TOP+L.PIRpx/2, t:"Uni-Pier",      s:null},

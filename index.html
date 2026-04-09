@@ -509,12 +509,9 @@ function App(){
   ];
   const balStyles=[
     {key:"none",label:"No"},
-    {key:"madison",label:"Madison"},
-    {key:"santa_rosa",label:"Santa Rosa"},
-    {key:"antigua",label:"Antigua (glass)"},
-    {key:"martinique",label:"Martinique"},
-    {key:"wire",label:"Wire tension"},
-    {key:"rendered",label:"Rendered panel"},
+    {key:"alum_vert",label:"Aluminium Vertical Balusters"},
+    {key:"glazed",label:"Glazed"},
+    {key:"hw_wire",label:"Hardwood Tensioned Wire"},
   ];
   const PROJECT_TYPES=["Deck","Concrete Slab","Pergola","Cabana","Gazebo","Shed","Carport","Garage","Extension","Renovation"];
 
@@ -630,31 +627,41 @@ screen===3&&(form.projectType==="Deck"||form.projectType==="Concrete Slab")&&Rea
       ),
       
       // ── SCREEN 4: Site + Spec ───────────────────────────────────
-      screen===4&&React.createElement("div",{className:"fade"},
+      screen===4&&form.projectType!=="Concrete Slab"&&React.createElement("div",{className:"fade"},
         jeff("Tell me about the site and what you'd like"),
         card(React.createElement("div",null,
           React.createElement("div",{style:{fontSize:13,fontWeight:600,marginBottom:10,color:"#555"}},"Deck dimensions"),
-          React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:4}},
-            [["length","Length (m)","5.0"],["width","Width (m)","4.0"]].map(([k,lbl,ph])=>
+          React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:8}},
+            [["length","Length (m)",0.1,2,20],["width","Width (m)",0.1,1,15]].map(([k,lbl,step,mn,mx])=>
               React.createElement("div",{key:k},
-                React.createElement("div",{style:{fontSize:11,color:"#aaa",marginBottom:4}},lbl),
-                React.createElement("input",{type:"text",inputMode:"decimal",value:form[k],placeholder:ph,
-                  onChange:ev=>upd(k,ev.target.value),
-                  onBlur:ev=>{const v=parseFloat(ev.target.value);if(!isNaN(v))upd(k,(Math.round(v*10)/10).toFixed(1));},
-                  style:{width:"100%",padding:"10px",borderRadius:10,border:`1px solid ${BD}`,
-                    fontSize:16,boxSizing:"border-box",WebkitAppearance:"none"}})
+                React.createElement("div",{style:{fontSize:11,color:"#aaa",marginBottom:6}},lbl),
+                React.createElement("div",{style:{display:"flex",alignItems:"center",gap:0,border:`1px solid ${BD}`,borderRadius:10,overflow:"hidden"}},
+                  React.createElement("button",{
+                    onClick:()=>{const v=Math.max(mn,Math.round((parseFloat(form[k]||5)-step)*10)/10);upd(k,v.toFixed(1));},
+                    style:{padding:"10px 14px",fontSize:18,fontWeight:300,background:"white",border:"none",cursor:"pointer",color:"#555"}},"−"),
+                  React.createElement("div",{style:{flex:1,textAlign:"center",fontSize:16,fontWeight:500,padding:"10px 0",background:"white"}},
+                    parseFloat(form[k]||5).toFixed(1)),
+                  React.createElement("button",{
+                    onClick:()=>{const v=Math.min(mx,Math.round((parseFloat(form[k]||5)+step)*10)/10);upd(k,v.toFixed(1));},
+                    style:{padding:"10px 14px",fontSize:18,fontWeight:300,background:"white",border:"none",cursor:"pointer",color:"#555"}},"+")
+                )
               )
             ),
             React.createElement("div",null,
-              React.createElement("div",{style:{fontSize:11,color:"#aaa",marginBottom:4}},"Height (mm)"),
-              React.createElement("input",{type:"text",inputMode:"numeric",value:form.heightMm,placeholder:"300",
-                onChange:ev=>upd("heightMm",ev.target.value),
-                onBlur:ev=>{const v=parseInt(ev.target.value);if(!isNaN(v))upd("heightMm",Math.round(v/50)*50||50);},
-                style:{width:"100%",padding:"10px",borderRadius:10,border:`1px solid ${BD}`,
-                  fontSize:16,boxSizing:"border-box",WebkitAppearance:"none"}})
+              React.createElement("div",{style:{fontSize:11,color:"#aaa",marginBottom:6}},"Height (mm)"),
+              React.createElement("div",{style:{display:"flex",alignItems:"center",gap:0,border:`1px solid ${BD}`,borderRadius:10,overflow:"hidden"}},
+                React.createElement("button",{
+                  onClick:()=>upd("heightMm",Math.max(50,Number(form.heightMm||800)-50)),
+                  style:{padding:"10px 14px",fontSize:18,fontWeight:300,background:"white",border:"none",cursor:"pointer",color:"#555"}},"−"),
+                React.createElement("div",{style:{flex:1,textAlign:"center",fontSize:16,fontWeight:500,padding:"10px 0",background:"white"}},
+                  `${form.heightMm||800}mm`),
+                React.createElement("button",{
+                  onClick:()=>upd("heightMm",Math.min(3000,Number(form.heightMm||800)+50)),
+                  style:{padding:"10px 14px",fontSize:18,fontWeight:300,background:"white",border:"none",cursor:"pointer",color:"#555"}},"+")
+              )
             )
           ),
-          React.createElement("div",{style:{fontSize:11,color:"#aaa",marginTop:6}},
+          React.createElement("div",{style:{fontSize:11,color:"#aaa"}},
             `Area: ${((parseFloat(form.length)||0)*(parseFloat(form.width)||0)).toFixed(1)}m²`)
         )),
         card(React.createElement("div",null,
@@ -806,8 +813,8 @@ screen===3&&(form.projectType==="Deck"||form.projectType==="Concrete Slab")&&Rea
               `${est.rules.nSteps} ${est.rules.nSteps===1?"step":"risers"} at ${est.rules.riser}mm, 300mm going, run ${est.rules.nSteps*300}mm`)
           )
         )),
-        screen===4&&React.createElement(PBtn,{label:"See my layout →",onClick:()=>go(5)}),
-        screen===4&&React.createElement(BackBtn,null)
+        screen===4&&form.projectType!=="Concrete Slab"&&React.createElement(PBtn,{label:"See my layout →",onClick:()=>go(5)}),
+        screen===4&&form.projectType!=="Concrete Slab"&&React.createElement(BackBtn,null)
       ),
 
       // ── SCREEN 4: Concrete Slab — integrated Jeff flow ──────
@@ -862,7 +869,7 @@ screen===3&&(form.projectType==="Deck"||form.projectType==="Concrete Slab")&&Rea
               :"Smooth — suitable for direct use, paint or sealer")
         )),
         card(React.createElement("div",null,
-          React.createElement("div",{style:{fontSize:13,fontWeight:600,marginBottom:10,color:"#555"}},"Additional requirements"),
+          React.createElement("div",{style:{fontSize:13,fontWeight:600,marginBottom:10,color:"#555"}},"Additional requirements to consider"),
           React.createElement("label",{style:{display:"flex",gap:10,alignItems:"center",padding:"8px 0",cursor:"pointer"}},
             React.createElement("input",{type:"checkbox",checked:form.concreteHasBal||false,
               onChange:ev=>upd("concreteHasBal",ev.target.checked),style:{width:16,height:16}}),

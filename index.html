@@ -43,7 +43,7 @@ function calcDeck(inputs) {
   // ── RULE: STAIR GEOMETRY (AS1657) ────────────────────────
   let stair = null;
   if (hasStairs) {
-    const nRisers  = Math.ceil(FFL / 180);
+    const nRisers  = Math.max(1, Math.ceil(FFL / 180));
     const riser    = Math.round(FFL / nRisers);
     const going    = 300;
     const stairRun = nRisers * going;
@@ -928,7 +928,8 @@ function App(){
               const hl=hwLine[D.houseWall]||hwLine.bottom;
               add(e("line",{x1:hl[0],y1:hl[1],x2:hl[2],y2:hl[3],stroke:"#1a1a1a","stroke-width":"4"}));
 
-                            // ── STAIR RECTANGLE (standard only — drawn before deck outline) ──
+                            // ── STAIR RECTANGLE — same rules regardless of riser count ──
+              // 1 step at ground level = 300mm going, shown same as any stair
               if(sr&&!isInset){
                 add(e("rect",{x:sr.x,y:sr.y,width:sr.w,height:sr.h,
                   fill:"#F5F0E8",stroke:"#1a1a1a","stroke-width":"0.8","stroke-dasharray":"4,3"}));

@@ -704,33 +704,6 @@ function App(){
           )
         )),
         card(React.createElement("div",null,
-          React.createElement("div",{style:{fontSize:11,fontWeight:600,color:"#aaa",textTransform:"uppercase",letterSpacing:1,marginBottom:8}},"Deck zones"),
-          React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginTop:8}},
-            React.createElement("div",null,
-              React.createElement("div",{style:{fontSize:12,color:"#aaa",marginBottom:6,fontWeight:500}},"Alfresco"),
-              React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:5}},
-                [["none","None"],["SW","SW"],["SE","SE"],["NW","NW"]].map(([k,l])=>
-                  React.createElement("button",{key:k,onClick:()=>{const sc={N:["NW","NE"],S:["SW","SE"],E:["NE","SE"],W:["NW","SW"]};if(k!=="none"&&(sc[form.layoutStairs]||[]).includes(k))return;upd("alfrescoZone",k);},
-                    style:{padding:"8px 4px",borderRadius:8,fontSize:12,fontWeight:500,cursor:"pointer",
-                      border:form.alfrescoZone===k?`2px solid #378ADD`:`1px solid ${BD}`,
-                      background:form.alfrescoZone===k?"#E6F1FB":"white"}},l)
-                )
-              )
-            ),
-            React.createElement("div",null,
-              React.createElement("div",{style:{fontSize:12,color:"#aaa",marginBottom:6,fontWeight:500}},"BBQ"),
-              React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:5}},
-                [["none","None"],["SE","SE"],["SW","SW"],["NE","NE"]].map(([k,l])=>
-                  React.createElement("button",{key:k,onClick:()=>{const sc={N:["NW","NE"],S:["SW","SE"],E:["NE","SE"],W:["NW","SW"]};if(k!=="none"&&(sc[form.layoutStairs]||[]).includes(k))return;upd("bbqZone",k);},
-                    style:{padding:"8px 4px",borderRadius:8,fontSize:12,fontWeight:500,cursor:"pointer",
-                      border:form.bbqZone===k?`2px solid #BA7517`:`1px solid ${BD}`,
-                      background:form.bbqZone===k?"#FAEEDA":"white"}},l)
-                )
-              )
-            )
-          )
-        )),
-        card(React.createElement("div",null,
           React.createElement("div",{style:{fontSize:13,fontWeight:600,marginBottom:8,color:"#555"}},"Stairs"),
           React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7,marginBottom:form.stairType!=="none"?10:0}},
             [["none","No stairs"],["standard","Standard"],["wide","Wide"],["landing","Inset"]].map(([k,l])=>
@@ -786,6 +759,40 @@ function App(){
       // ── SCREEN 5: Layout plan ───────────────────────────────────
       screen===5&&React.createElement("div",{className:"fade"},
         jeff("Your layout plan","Footing grid and board layout."),
+        (()=>{
+          const sc={N:["NW","NE"],S:["SW","SE"],E:["NE","SE"],W:["NW","SW"]};
+          const blocked=sc[form.layoutStairs]||[];
+          const alfConflict=form.alfrescoZone!=="none"&&blocked.includes(form.alfrescoZone);
+          const bbqConflict=form.bbqZone!=="none"&&blocked.includes(form.bbqZone);
+          return (alfConflict||bbqConflict)?warn(`Zone conflict — ${alfConflict?"Alfresco":""}${alfConflict&&bbqConflict?" and ":""}${bbqConflict?"BBQ":""} overlaps stair area. Change stair face or move the zone.`):null;
+        })(),
+        card(React.createElement("div",null,
+          React.createElement("div",{style:{fontSize:11,fontWeight:600,color:"#aaa",textTransform:"uppercase",letterSpacing:1,marginBottom:8}},"Deck zones"),
+          React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginTop:8}},
+            React.createElement("div",null,
+              React.createElement("div",{style:{fontSize:12,color:"#aaa",marginBottom:6,fontWeight:500}},"Alfresco"),
+              React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:5}},
+                [["none","None"],["SW","SW"],["SE","SE"],["NW","NW"]].map(([k,l])=>
+                  React.createElement("button",{key:k,onClick:()=>upd("alfrescoZone",k),
+                    style:{padding:"8px 4px",borderRadius:8,fontSize:12,fontWeight:500,cursor:"pointer",
+                      border:form.alfrescoZone===k?`2px solid #378ADD`:`1px solid ${BD}`,
+                      background:form.alfrescoZone===k?"#E6F1FB":"white"}},l)
+                )
+              )
+            ),
+            React.createElement("div",null,
+              React.createElement("div",{style:{fontSize:12,color:"#aaa",marginBottom:6,fontWeight:500}},"BBQ"),
+              React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:5}},
+                [["none","None"],["SE","SE"],["SW","SW"],["NE","NE"]].map(([k,l])=>
+                  React.createElement("button",{key:k,onClick:()=>upd("bbqZone",k),
+                    style:{padding:"8px 4px",borderRadius:8,fontSize:12,fontWeight:500,cursor:"pointer",
+                      border:form.bbqZone===k?`2px solid #BA7517`:`1px solid ${BD}`,
+                      background:form.bbqZone===k?"#FAEEDA":"white"}},l)
+                )
+              )
+            )
+          )
+        )),
         card((()=>{
           const R=calcDeck({
             Lm:parseFloat(form.length)||5,
@@ -1149,17 +1156,26 @@ function App(){
                 add(e("rect",{x:OX-pw2,y:FFL_Y+2,width:deckWpx+pw2*2,height:4,fill:"#F5F0E8",stroke:"#1a1a1a","stroke-width":"0.7"}));
               }
 
-              // Stringer — only drawn if stair face aligns with section cut
+              // Stringer — drawn LAST so it appears on top of deck for inset
               if(stair){
+                // White knockout so stringer shows clearly over deck
+                if(isInset){
+                  add(e("rect",{x:stairStartX,y:FFL_Y,
+                    width:stair.stW,height:L.GY-FFL_Y+L.PADpx+4,
+                    fill:"white",stroke:"none"}));
+                  // Redraw soil in stair zone
+                  add(e("rect",{x:stairStartX,y:L.GY,width:stair.stW+4,height:L.PADpx+10,fill:"#F0ECE4"}));
+                  for(let i=0;i<6;i++) add(e("line",{x1:stairStartX+i*22,y1:L.GY,x2:stairStartX+i*22-11,y2:L.GY+L.PADpx+10,stroke:"#bbb","stroke-width":"0.35"}));
+                }
                 add(e("polygon",{points:stair.poly,fill:"#F5F0E8",stroke:"#1a1a1a","stroke-width":"0.9"}));
                 stair.treads.forEach(t=>add(e("rect",{x:t.x,y:t.y,width:t.w,height:t.h,fill:"#F5F0E8",stroke:"#1a1a1a","stroke-width":"0.7"})));
                 add(e("rect",{x:stair.padX,y:stair.padY,width:stair.padW,height:stair.padH,fill:"#E8E8E8",stroke:"#1a1a1a","stroke-width":"0.7"}));
+                // Redraw deck edge line over stringer top
+                add(e("line",{x1:stairStartX,y1:FFL_Y,x2:stairStartX+stair.stW,y2:FFL_Y,
+                  stroke:"#1a1a1a","stroke-width":"0.6","stroke-dasharray":"5,3"}));
               } else if(D.hasStairs){
-                // Stairs exist but on a different face — note on drawing
-                add(e("text",{x:OX+deckWpx+8,y:FFL_Y+20,fontSize:7,fill:"#aaa"},
-                  `Stairs ${D.stairFace} face`));
-                add(e("text",{x:OX+deckWpx+8,y:FFL_Y+30,fontSize:7,fill:"#aaa"},
-                  "see elevation"));
+                add(e("text",{x:OX+deckWpx+8,y:FFL_Y+20,fontSize:7,fill:"#aaa"},`Stairs ${D.stairFace} face`));
+                add(e("text",{x:OX+deckWpx+8,y:FFL_Y+30,fontSize:7,fill:"#aaa"},"— see elevation"));
               }
 
               // ── LEFT DIMS — numbers only, no "mm", no duplication ──

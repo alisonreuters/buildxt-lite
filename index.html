@@ -971,7 +971,7 @@ function App(){
                   }
                 }
                 add(e("text",{x:sr.x+sr.w/2,y:sr.y+sr.h/2+3,
-                  fontSize:7,fill:"#888","text-anchor":"middle"},"inset"));
+                  fontSize:7,fill:"#888","text-anchor":"middle"},"Stairs"));
               }
 
               // ── ALFRESCO ZONE (if placed) ─────────────────────
@@ -1061,7 +1061,10 @@ function App(){
           // Stair projects from RIGHT side of section drawing
           // For inset stairs, stair starts inside deck not at edge
           const isInset=form.stairType==="landing";
-          const stair=stairInSection?stairComponent(D,SC,OX+deckWpx,FFL_Y,L.GY):null;
+          // Inset stair: shift stringer LEFT so right edge = deck right edge
+          // Standard stair: starts at deck right edge, projects right
+          const stairStartX=isInset?(OX+deckWpx-stRunPx):OX+deckWpx;
+          const stair=stairInSection?stairComponent(D,SC,stairStartX,FFL_Y,L.GY):null;
 
           const ns="http://www.w3.org/2000/svg";
           const e=(tag,attrs,txt)=>{

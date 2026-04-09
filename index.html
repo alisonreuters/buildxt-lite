@@ -759,40 +759,85 @@ function App(){
       // ── SCREEN 5: Layout plan ───────────────────────────────────
       screen===5&&React.createElement("div",{className:"fade"},
         jeff("Your layout plan","Footing grid and board layout."),
-        (()=>{
-          const sc={N:["NW","NE"],S:["SW","SE"],E:["NE","SE"],W:["NW","SW"]};
-          const blocked=sc[form.layoutStairs]||[];
-          const alfConflict=form.alfrescoZone!=="none"&&blocked.includes(form.alfrescoZone);
-          const bbqConflict=form.bbqZone!=="none"&&blocked.includes(form.bbqZone);
-          return (alfConflict||bbqConflict)?warn(`Zone conflict — ${alfConflict?"Alfresco":""}${alfConflict&&bbqConflict?" and ":""}${bbqConflict?"BBQ":""} overlaps stair area. Change stair face or move the zone.`):null;
-        })(),
-        card(React.createElement("div",null,
-          React.createElement("div",{style:{fontSize:11,fontWeight:600,color:"#aaa",textTransform:"uppercase",letterSpacing:1,marginBottom:8}},"Deck zones"),
-          React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginTop:8}},
-            React.createElement("div",null,
-              React.createElement("div",{style:{fontSize:12,color:"#aaa",marginBottom:6,fontWeight:500}},"Alfresco"),
-              React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:5}},
-                [["none","None"],["SW","SW"],["SE","SE"],["NW","NW"]].map(([k,l])=>
-                  React.createElement("button",{key:k,onClick:()=>upd("alfrescoZone",k),
-                    style:{padding:"8px 4px",borderRadius:8,fontSize:12,fontWeight:500,cursor:"pointer",
-                      border:form.alfrescoZone===k?`2px solid #378ADD`:`1px solid ${BD}`,
-                      background:form.alfrescoZone===k?"#E6F1FB":"white"}},l)
+
+        card((()=>{
+          // Draggable zones on mini deck footprint
+          const [drag,setDrag]=React.useState(null);
+          const miniW=220,miniH=Math.round(220*(parseFloat(form.width)||4)/(parseFloat(form.length)||5));
+          const zonePositions={
+            NW:{x:0,y:0},NE:{x:1,y:0},SW:{x:0,y:1},SE:{x:1,y:1},none:null
+          };
+          const snapToCorner=(px,py,containerW,containerH)=>{
+            const nx=px/containerW>0.5?1:0;
+            const ny=py/containerH>0.5?1:0;
+            return ["NW","NE","SW","SE"][[0,1,2,3].find(i=>[0,1,0,1][i]===nx&&[0,0,1,1][i]===ny)];
+          };
+
+          const alfPos=zonePositions[form.alfrescoZone]||{x:0,y:1};
+          const bbqPos=zonePositions[form.bbqZone]||{x:1,y:1};
+          const alfPx={x:alfPos.x*(miniW*0.55),y:alfPos.y*(miniH*0.55)};
+          const bbqPx={x:bbqPos.x*(miniW*0.7),y:bbqPos.y*(miniH*0.7)};
+
+          return React.createElement("div",null,
+            React.createElement("div",{style:{fontSize:11,fontWeight:600,color:"#aaa",textTransform:"uppercase",letterSpacing:1,marginBottom:10}},"Deck zones"),
+            React.createElement("div",{style:{fontSize:12,color:"#999",marginBottom:10}},"Drag Alfresco and BBQ onto the deck"),
+            React.createElement("div",{style:{position:"relative",width:miniW,height:miniH,
+              border:"1.5px solid #1a1a1a",background:"#FAFAF8",margin:"0 auto 12px",borderRadius:2,
+              overflow:"visible",userSelect:"none"}},
+
+              // Alfresco zone
+              form.alfrescoZone!=="none"&&React.createElement("div",{
+                style:{position:"absolute",left:alfPx.x,top:alfPx.y,
+                  width:miniW*0.48,height:miniH*0.48,
+                  background:"rgba(55,138,221,0.15)",border:"1.5px dashed #378ADD",
+                  borderRadius:2,cursor:"grab",display:"flex",alignItems:"center",
+                  justifyContent:"center",fontSize:10,color:"#185FA5",fontWeight:500},
+                onMouseDown:e=>{e.preventDefault();setDrag("alfresco");},
+                onTouchStart:e=>{e.preventDefault();setDrag("alfresco");}
+              },"Alfresco"),
+              // BBQ zone
+              form.bbqZone!=="none"&&React.createElement("div",{
+                style:{position:"absolute",left:bbqPx.x,top:bbqPx.y,
+                  width:miniW*0.28,height:miniH*0.28,
+                  background:"rgba(186,117,23,0.12)",border:"1.5px solid #BA7517",
+                  borderRadius:2,cursor:"grab",display:"flex",alignItems:"center",
+                  justifyContent:"center",fontSize:10,color:"#633806",fontWeight:500},
+                onMouseDown:e=>{e.preventDefault();setDrag("bbq");},
+                onTouchStart:e=>{e.preventDefault();setDrag("bbq");}
+              },"BBQ")
+            ),
+            // Simple corner buttons as fallback (cleaner than drag for mobile)
+            React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}},
+              React.createElement("div",null,
+                React.createElement("div",{style:{fontSize:11,color:"#aaa",marginBottom:5}},"Alfresco"),
+                React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4}},
+                  [["none","—"],["NW","NW"],["NE","NE"],["SW","SW"],["SE","SE"]].map(([k,l])=>
+                    React.createElement("button",{key:k,
+                      onClick:()=>upd("alfrescoZone",k),
+                      style:{padding:"6px 2px",borderRadius:6,fontSize:11,cursor:"pointer",
+                        
+                        border:form.alfrescoZone===k?"2px solid #378ADD":"1px solid #e5e5e5",
+                        background:form.alfrescoZone===k?"#E6F1FB":"white"}},l)
+                  )
+                )
+              ),
+              React.createElement("div",null,
+                React.createElement("div",{style:{fontSize:11,color:"#aaa",marginBottom:5}},"BBQ"),
+                React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4}},
+                  [["none","—"],["NW","NW"],["NE","NE"],["SW","SW"],["SE","SE"]].map(([k,l])=>
+                    React.createElement("button",{key:k,
+                      onClick:()=>upd("bbqZone",k),
+                      style:{padding:"6px 2px",borderRadius:6,fontSize:11,cursor:"pointer",
+                        
+                        border:form.bbqZone===k?"2px solid #BA7517":"1px solid #e5e5e5",
+                        background:form.bbqZone===k?"#FAEEDA":"white"}},l)
+                  )
                 )
               )
             ),
-            React.createElement("div",null,
-              React.createElement("div",{style:{fontSize:12,color:"#aaa",marginBottom:6,fontWeight:500}},"BBQ"),
-              React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:5}},
-                [["none","None"],["SE","SE"],["SW","SW"],["NE","NE"]].map(([k,l])=>
-                  React.createElement("button",{key:k,onClick:()=>upd("bbqZone",k),
-                    style:{padding:"8px 4px",borderRadius:8,fontSize:12,fontWeight:500,cursor:"pointer",
-                      border:form.bbqZone===k?`2px solid #BA7517`:`1px solid ${BD}`,
-                      background:form.bbqZone===k?"#FAEEDA":"white"}},l)
-                )
-              )
-            )
-          )
-        )),
+
+          );
+        })()),
         card((()=>{
           const R=calcDeck({
             Lm:parseFloat(form.length)||5,

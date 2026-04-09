@@ -986,9 +986,8 @@ function App(){
 
       // ── SCREEN 6: Technical drawings ─────────────────────────────
       screen===6&&React.createElement("div",{className:"fade"},
-        jeff("Section A-A","Calculated from your inputs — 1:10 scale."),
+        jeff("Section A-A","Calculated from your inputs."),
         card((()=>{
-          // ── CALL RULES ENGINE ──────────────────────────────
           const R=calcDeck({
             Lm:parseFloat(form.length)||5,
             Dm:parseFloat(form.width)||4,
@@ -1003,11 +1002,19 @@ function App(){
             houseWall:form.houseWall||"bottom",
           });
           const D=R.draw;
-          const SC=0.1; // 1:10 scale
+          const SC=0.1;
 
-          // ── SECTION LAYOUT from component ──────────────────
+          // ── SECTION DRAWING RULES ─────────────────────────
+          // 1. Labels: words RIGHT only, dims LEFT only — no duplication
+          // 2. Left dims: FFL total, pier height, footing depth — numbers only, no "mm"
+          // 3. Right labels: member names only — no sizes in drawing (sizes in spec sheet)
+          // 4. Balustrade: posts + top rail only — no infill shown
+          // 5. Bearer: no label inside drawing
+          // 6. No title line, no scale bar, no AS codes
+          // 7. Text 1pt smaller throughout (8px → 7px, 9px → 8px)
+
           const BALpx=D.hasBal?Math.max(40,D.balH*SC):0;
-          const ML=170,MR=200,MT=D.hasBal?BALpx+30:30,MB=70;
+          const ML=130,MR=185,MT=D.hasBal?BALpx+30:30,MB=60;
           const deckWpx=D.deckWmm*SC;
           const stRunPx=D.hasStairs?D.stair.stairRun*SC:0;
           const CVS_W=ML+deckWpx+stRunPx+MR;
@@ -1015,12 +1022,8 @@ function App(){
           const L=deckSectionLayout(D,SC,FFL_Y);
           const CVS_H=Math.round(L.PAD_BOT+MB);
           const OX=ML;
-
-          // Pier X positions
           const nBRows=R.nBearerRows;
           const pierXs=Array.from({length:nBRows},(_,i)=>OX+(i/Math.max(1,nBRows-1))*deckWpx);
-
-          // Stringer from component
           const stair=D.hasStairs?stairComponent(D,SC,OX+deckWpx,FFL_Y,L.GY):null;
 
           const ns="http://www.w3.org/2000/svg";
@@ -1042,35 +1045,29 @@ function App(){
               svg.style.cssText="display:block;background:white;border-radius:10px;border:1px solid #e5e5e5;margin-bottom:8px";
               const add=el=>svg.appendChild(el);
 
-              // Title
-              add(e("text",{x:OX,y:MT-12,fontSize:7.5,fill:"#bbb"},
-                `Section A-A · ${D.Dm}m × ${D.Lm}m · FFL ${D.FFL}mm · ${D.boardDir} boards · Scale 1:10`));
-
               // Soil hatch
               add(e("rect",{x:OX-10,y:L.GY,width:deckWpx+stRunPx+20,height:L.PADpx+10,fill:"#F0ECE4"}));
               for(let i=0;i<14;i++) add(e("line",{x1:OX-10+i*22,y1:L.GY,x2:OX-10+i*22-11,y2:L.GY+L.PADpx+10,stroke:"#bbb","stroke-width":"0.35"}));
 
-              // GL
-              add(e("line",{x1:OX-ML+10,y1:L.GY,x2:OX+deckWpx+stRunPx+20,y2:L.GY,stroke:"#1a1a1a","stroke-width":"1.2"}));
-              add(e("text",{x:OX-ML+6,y:L.GY+4,fontSize:9,fill:"#1a1a1a","font-weight":"bold"},"GL"));
+              // GL line
+              add(e("line",{x1:10,y1:L.GY,x2:OX+deckWpx+stRunPx+20,y2:L.GY,stroke:"#1a1a1a","stroke-width":"1.2"}));
+              add(e("text",{x:8,y:L.GY+4,fontSize:8,fill:"#1a1a1a","font-weight":"bold"},"GL"));
 
-              // FFL
-              add(e("line",{x1:OX-ML+10,y1:FFL_Y,x2:OX+deckWpx+stRunPx+10,y2:FFL_Y,stroke:"#1a1a1a","stroke-width":"0.6","stroke-dasharray":"5,3"}));
-              add(e("text",{x:OX-ML+6,y:FFL_Y+4,fontSize:9,fill:"#1a1a1a","font-weight":"bold"},"FFL"));
+              // FFL dashed line
+              add(e("line",{x1:10,y1:FFL_Y,x2:OX+deckWpx+stRunPx+10,y2:FFL_Y,stroke:"#1a1a1a","stroke-width":"0.6","stroke-dasharray":"5,3"}));
+              add(e("text",{x:8,y:FFL_Y+4,fontSize:8,fill:"#1a1a1a","font-weight":"bold"},"FFL"));
 
-              // Footings — T shape, flush at GL
+              // Footings — T shape
               pierXs.forEach(px=>{
                 add(e("rect",{x:px-D.footing.W*SC/2,y:L.GY,width:D.footing.W*SC,height:L.PADpx,fill:"#E8E8E8",stroke:"#1a1a1a","stroke-width":"0.8"}));
                 for(let h=1;h<=3;h++) add(e("line",{x1:px-D.footing.W*SC/2,y1:L.GY+h*L.PADpx/4,x2:px+D.footing.W*SC/2,y2:L.GY+h*L.PADpx/4,stroke:"#aaa","stroke-width":"0.35"}));
-                // Pier
                 const pw=Math.max(10,D.bearer.W*SC);
                 add(e("rect",{x:px-pw/2,y:L.PIR_TOP,width:pw,height:L.PIRpx,fill:"#E8E8E8",stroke:"#1a1a1a","stroke-width":"0.8"}));
                 add(e("rect",{x:px-pw/2-3,y:L.PIR_TOP-3,width:pw+6,height:3,fill:"#555",stroke:"none"}));
               });
 
-              // Bearer
+              // Bearer — no label inside
               add(e("rect",{x:OX,y:L.BR_TOP,width:deckWpx,height:L.BRpx,fill:"#F5F0E8",stroke:"#1a1a1a","stroke-width":"1"}));
-              add(e("text",{x:OX+deckWpx/2,y:L.BR_TOP+L.BRpx/2+3,fontSize:8,fill:"#1a1a1a","text-anchor":"middle","font-weight":"500"},D.bearer.label));
 
               // Joists
               const nJ=Math.min(12,Math.ceil(D.deckWmm/D.joist.spacingMm)+1);
@@ -1090,87 +1087,76 @@ function App(){
               add(e("rect",{x:OX-fW,y:L.JT_TOP,width:fW,height:L.JTpx+L.DKpx,fill:"#F5F0E8",stroke:"#1a1a1a","stroke-width":"0.8"}));
               add(e("rect",{x:OX+deckWpx,y:L.JT_TOP,width:fW,height:L.JTpx+L.DKpx,fill:"#F5F0E8",stroke:"#1a1a1a","stroke-width":"0.8"}));
 
-              // Balustrade
+              // Balustrade — posts + top rail ONLY (rule: no infill shown)
               if(D.hasBal){
                 const BT=L.BAL_TOP, BH=L.BALpx, pw2=8;
+                // Left post
                 add(e("rect",{x:OX-pw2/2,y:BT,width:pw2,height:BH,fill:"#F5F0E8",stroke:"#1a1a1a","stroke-width":"0.8"}));
+                // Right post
                 add(e("rect",{x:OX+deckWpx-pw2/2,y:BT,width:pw2,height:BH,fill:"#F5F0E8",stroke:"#1a1a1a","stroke-width":"0.8"}));
-                add(e("rect",{x:OX-8,y:BT,width:deckWpx+16,height:5,fill:"#F5F0E8",stroke:"#1a1a1a","stroke-width":"0.8"}));
-                for(let i=1;i<=6;i++) add(e("line",{x1:OX,y1:BT+BH*i/7,x2:OX+deckWpx,y2:BT+BH*i/7,stroke:"#999","stroke-width":"0.5"}));
+                // Top rail only
+                add(e("rect",{x:OX-pw2,y:BT,width:deckWpx+pw2*2,height:5,fill:"#F5F0E8",stroke:"#1a1a1a","stroke-width":"0.8"}));
+                // Bottom rail at FFL
+                add(e("rect",{x:OX-pw2,y:FFL_Y+2,width:deckWpx+pw2*2,height:4,fill:"#F5F0E8",stroke:"#1a1a1a","stroke-width":"0.7"}));
               }
 
-              // Stringer from validated component
+              // Stringer
               if(stair){
                 add(e("polygon",{points:stair.poly,fill:"#F5F0E8",stroke:"#1a1a1a","stroke-width":"0.9"}));
                 stair.treads.forEach(t=>add(e("rect",{x:t.x,y:t.y,width:t.w,height:t.h,fill:"#F5F0E8",stroke:"#1a1a1a","stroke-width":"0.7"})));
                 add(e("rect",{x:stair.padX,y:stair.padY,width:stair.padW,height:stair.padH,fill:"#E8E8E8",stroke:"#1a1a1a","stroke-width":"0.7"}));
-                for(let h=1;h<=2;h++) add(e("line",{x1:stair.padX,y1:stair.padY+h*stair.padH/3,x2:stair.padX+stair.padW,y2:stair.padY+h*stair.padH/3,stroke:"#aaa","stroke-width":"0.3"}));
-                add(e("text",{x:OX+deckWpx+stair.stW*0.42,y:FFL_Y+(L.GY-FFL_Y)*0.55,fontSize:8,fill:"#888","text-anchor":"middle"},`${D.stair.angle}deg`));
               }
 
-              // ── LABELS right side, stacked with 22px gap ──
-              const LPAD=OX+deckWpx+stRunPx+12;
-              const lbls=[
-                {y:L.DK_TOP+L.DKpx/2,   t:`Decking ${D.decking.D}x${D.decking.W}`, s:D.boardDir+" boards"},
-                {y:L.JT_TOP+L.JTpx/2,   t:`Joist ${D.joist.D}x${D.joist.W} ${D.joist.grade}`, s:`@ ${D.joist.spacingMm}mm ctrs`},
-                {y:L.BR_TOP+L.BRpx/2,   t:D.bearer.label, s:"bearer"},
-                {y:L.PIR_TOP+L.PIRpx/2, t:"Uni-Pier", s:`${R.pierH}mm`},
-                {y:L.GY+L.PADpx/2,      t:"Pad footing", s:`${D.footing.W}x${D.footing.D}x${D.footing.H}mm`},
-              ];
-              if(D.hasStairs) lbls.push({y:FFL_Y+(L.GY-FFL_Y)*0.35,t:"Stringer 300x45",s:"notched open tread"});
-              if(D.hasBal) lbls.splice(0,0,{y:L.BAL_TOP+L.BALpx/2,t:`Balustrade`,s:`${D.balH}mm`});
-              // Enforce 20px minimum gap
-              let lastY=-999;
-              lbls.forEach(({y,t,s})=>{
-                const ay=Math.max(y,lastY+20);
-                lastY=ay+(s?22:12);
-                add(e("text",{x:LPAD,y:ay+2,fontSize:8.5,fill:"#1a1a1a","font-weight":"500"},t));
-                if(s) add(e("text",{x:LPAD,y:ay+13,fontSize:7.5,fill:"#666"},s));
-              });
-
-              // ── DIMS ──
-              // Left: member depths
-              [[L.DK_TOP,L.DK_TOP+L.DKpx,"19"],[L.JT_TOP,L.JT_TOP+L.JTpx,`${D.joist.D}`],[L.BR_TOP,L.BR_BOT,`${D.bearer.D}`]].forEach(([y1,y2,lbl])=>{
-                const bx=OX-14;
-                add(e("line",{x1:OX-2,y1:y1,x2:bx,y2:y1,stroke:"#888","stroke-width":"0.5"}));
-                add(e("line",{x1:OX-2,y1:y2,x2:bx,y2:y2,stroke:"#888","stroke-width":"0.5"}));
-                add(e("line",{x1:bx,y1:y1,x2:bx,y2:y2,stroke:"#888","stroke-width":"0.5"}));
-                add(e("text",{x:bx-3,y:(y1+y2)/2+3,fontSize:7.5,fill:"#666","text-anchor":"end"},lbl));
-              });
-
-              // Left: FFL and pier dims
+              // ── LEFT DIMS — numbers only, no "mm", no duplication ──
+              // Rule: FFL total, pier height, footing depth only
               const dv=(x,y1,y2,lbl)=>{
                 if(Math.abs(y2-y1)<4)return;
                 const my=(y1+y2)/2;
                 add(e("line",{x1:x,y1:y1,x2:x,y2:y2,stroke:"#555","stroke-width":"0.5"}));
                 add(e("line",{x1:x-3,y1:y1,x2:x+3,y2:y1,stroke:"#555","stroke-width":"0.5"}));
                 add(e("line",{x1:x-3,y1:y2,x2:x+3,y2:y2,stroke:"#555","stroke-width":"0.5"}));
-                add(e("text",{x:x-12,y:my+3,fontSize:8,fill:"#333","text-anchor":"middle",transform:`rotate(-90,${x-12},${my})`},lbl));
+                add(e("text",{x:x-12,y:my+3,fontSize:7,fill:"#444","text-anchor":"middle",
+                  transform:`rotate(-90,${x-12},${my})`},lbl));
               };
-              dv(OX-40,FFL_Y,L.GY,`${D.FFL}mm FFL`);
-              dv(OX-56,L.PIR_TOP,L.GY,`${R.pierH}mm`);
-              dv(OX-72,L.GY,L.GY+L.PADpx,"400mm");
-              if(D.hasBal) dv(OX-40,L.BAL_TOP,FFL_Y,`${D.balH}mm`);
+              // FFL total (GL to FFL)
+              dv(OX-20,FFL_Y,L.GY,`${D.FFL}`);
+              // Pier height
+              dv(OX-36,L.PIR_TOP,L.GY,`${R.pierH}`);
+              // Footing depth
+              dv(OX-52,L.GY,L.GY+L.PADpx,"400");
+              // Balustrade height — left side (rule: not duplicated on right)
+              if(D.hasBal) dv(OX-20,L.BAL_TOP,FFL_Y,`${D.balH}`);
 
-              // Bottom dims
-              const dimY=L.GY+L.PADpx+18;
-              [[OX,OX+deckWpx,`${Math.round(D.deckWmm)}mm`],
-               ...(D.hasStairs?[[OX+deckWpx,OX+deckWpx+stRunPx,`${D.stair.stairRun}mm`]]:[])]
-              .forEach(([x1,x2,lbl])=>{
+              // ── RIGHT LABELS — words only, no sizes ──────────
+              // Rule: one label per member, stacked with min 20px gap
+              const LPAD=OX+deckWpx+stRunPx+10;
+              const lbls=[
+                {y:L.DK_TOP+L.DKpx/2,   t:"Decking",       s:D.boardDir+" boards"},
+                {y:L.JT_TOP+L.JTpx/2,   t:"Joist",         s:null},
+                {y:L.BR_TOP+L.BRpx/2,   t:"Bearer",        s:null},
+                {y:L.PIR_TOP+L.PIRpx/2, t:"Uni-Pier",      s:null},
+                {y:L.GY+L.PADpx/2,      t:"Pad footing",   s:null},
+              ];
+              if(D.hasStairs) lbls.push({y:FFL_Y+(L.GY-FFL_Y)*0.35,t:"Stringer",s:null});
+              if(D.hasBal) lbls.unshift({y:L.BAL_TOP+L.BALpx/2,t:"Balustrade",s:null});
+              let lastY=-999;
+              lbls.forEach(({y,t,s})=>{
+                const ay=Math.max(y,lastY+20);
+                lastY=ay+(s?20:12);
+                add(e("text",{x:LPAD,y:ay+2,fontSize:8,fill:"#1a1a1a","font-weight":"500"},t));
+                if(s) add(e("text",{x:LPAD,y:ay+12,fontSize:7,fill:"#888"},s));
+              });
+
+              // Bottom dims — metres
+              const dimY=L.GY+L.PADpx+16;
+              [[OX,OX+deckWpx,`${D.Dm}m`],
+               ...(D.hasStairs?[[OX+deckWpx,OX+deckWpx+stRunPx,`${(D.stair.stairRun/1000).toFixed(1)}m`]]:[])
+              ].forEach(([x1,x2,lbl])=>{
                 add(e("line",{x1,y1:dimY,x2,y2:dimY,stroke:"#555","stroke-width":"0.6"}));
                 add(e("line",{x1,y1:dimY-3,x2:x1,y2:dimY+3,stroke:"#555","stroke-width":"0.6"}));
                 add(e("line",{x1:x2,y1:dimY-3,x2,y2:dimY+3,stroke:"#555","stroke-width":"0.6"}));
-                add(e("text",{x:(x1+x2)/2,y:dimY+13,fontSize:9,fill:"#333","text-anchor":"middle"},lbl));
+                add(e("text",{x:(x1+x2)/2,y:dimY+12,fontSize:8,fill:"#333","text-anchor":"middle"},lbl));
               });
-
-              // Scale bar
-              const sbY=CVS_H-16;
-              add(e("rect",{x:OX,y:sbY-5,width:50,height:5,fill:"#333"}));
-              add(e("rect",{x:OX+50,y:sbY-5,width:50,height:5,fill:"white",stroke:"#333","stroke-width":"0.8"}));
-              add(e("text",{x:OX,y:sbY+9,fontSize:7.5,fill:"#333"},"0"));
-              add(e("text",{x:OX+50,y:sbY+9,fontSize:7.5,fill:"#333","text-anchor":"middle"},"500mm"));
-              add(e("text",{x:OX+100,y:sbY+9,fontSize:7.5,fill:"#333","text-anchor":"middle"},"1000mm"));
-              add(e("text",{x:OX+108,y:sbY+9,fontSize:7.5,fill:"#999"},"Scale 1:10 · AS1684 · AS1657"));
 
               ref.appendChild(svg);
             }})

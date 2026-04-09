@@ -825,7 +825,6 @@ function App(){
             E:{x:isInset?OX+deckWpx-stRunPx:OX+deckWpx, y:OY+(deckDpx-stWpx)/2, w:stRunPx, h:stWpx},
             W:{x:isInset?OX:OX-stRunPx, y:OY+(deckDpx-stWpx)/2, w:stRunPx, h:stWpx},
           };
-          const isInset=form.stairType==="landing";
           const sr=D.hasStairs?(stairRects[D.stairFace]||stairRects.S):null;
 
           // Fixed placeholder positions
@@ -1048,7 +1047,6 @@ function App(){
           // Stair projects from RIGHT side of section drawing
           // For inset stairs, stair starts inside deck not at edge
           const isInset=form.stairType==="landing";
-          const stairOriginX=isInset?OX+deckWpx-D.hasStairs&&stair?D.stair.stairRun*SC:0:OX+deckWpx;
           const stair=stairInSection?stairComponent(D,SC,OX+deckWpx,FFL_Y,L.GY):null;
 
           const ns="http://www.w3.org/2000/svg";

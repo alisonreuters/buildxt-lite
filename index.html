@@ -856,16 +856,16 @@ function App(){
               // ── TOP ZONE ─────────────────────────────────────
               // Title — top left
               add(e("text",{x:ZONE_LFT,y:12,fontSize:6.5,fill:"#ccc"},
-                `Plan view · ${D.Lm}m × ${D.Dm}m · FFL ${D.FFL}mm · ${D.boardDir} boards`));
-              // N label — top centre
-              add(e("text",{x:midX,y:16,fontSize:8,fill:"#ccc","text-anchor":"middle"},"N"));
+                `Plan view · ${D.Lm}m × ${D.Dm}m · FFL ${D.FFL}mm`));
+              // N label — tight to top of deck
+              add(e("text",{x:midX,y:OY-3,fontSize:7,fill:"#ddd","text-anchor":"middle"},"N"));
               // A circle top — below N
               add(e("circle",{cx:sectNS?midX:ZONE_LFT-14,cy:sectNS?28:midY,r:6,fill:"white",stroke:"#888","stroke-width":"0.8"}));
               add(e("text",{x:sectNS?midX:ZONE_LFT-14,y:sectNS?32:midY+3,fontSize:7,fill:"#888","text-anchor":"middle","font-weight":"600"},"A"));
 
               // ── BOTTOM ZONE ───────────────────────────────────
-              // S label
-              add(e("text",{x:midX,y:CVS_H-34,fontSize:8,fill:"#ccc","text-anchor":"middle"},"S"));
+              // S label — tight to bottom of deck
+              add(e("text",{x:midX,y:OY+deckDpx+10,fontSize:7,fill:"#ddd","text-anchor":"middle"},"S"));
               // A circle bottom
               add(e("circle",{cx:sectNS?midX:CVS_W-ZONE_RGT+14,cy:sectNS?CVS_H-22:midY,r:6,fill:"white",stroke:"#888","stroke-width":"0.8"}));
               add(e("text",{x:sectNS?midX:CVS_W-ZONE_RGT+14,y:sectNS?CVS_H-18:midY+3,fontSize:7,fill:"#888","text-anchor":"middle","font-weight":"600"},"A"));
@@ -877,8 +877,8 @@ function App(){
               add(e("text",{x:midX,y:dimY+6,fontSize:9,fill:"#333","text-anchor":"middle"},`${D.Lm}m`));
 
               // ── LEFT ZONE ─────────────────────────────────────
-              // W label
-              add(e("text",{x:10,y:midY+3,fontSize:8,fill:"#ccc","text-anchor":"middle"},"W"));
+              // W label — tight to left of deck
+              add(e("text",{x:OX-5,y:midY+3,fontSize:7,fill:"#ddd","text-anchor":"end"},"W"));
               // Depth dim
               const dimX=ZONE_LFT-28;
               add(e("line",{x1:dimX,y1:OY,x2:dimX,y2:OY+deckDpx,stroke:"#555","stroke-width":"0.6"}));
@@ -888,8 +888,8 @@ function App(){
                 transform:`rotate(-90,${dimX-14},${midY})`},`${D.Dm}m`));
 
               // ── RIGHT ZONE ────────────────────────────────────
-              // E label
-              add(e("text",{x:CVS_W-10,y:midY+3,fontSize:8,fill:"#ccc","text-anchor":"middle"},"E"));
+              // E label — tight to right of deck
+              add(e("text",{x:OX+deckWpx+5,y:midY+3,fontSize:7,fill:"#ddd","text-anchor":"start"},"E"));
 
               // ── SECTION CUT LINE ──────────────────────────────
               if(sectNS){

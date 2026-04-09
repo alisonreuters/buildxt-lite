@@ -427,7 +427,7 @@ function App(){
     length:"5.0",width:"4.0",siteCondition:"",deckLevel:"ground",
     heightMm:800,houseWall:"bottom",layoutBoard:"EW",layoutStairs:"S",layoutStairsFull:false,
     deckingType:"merbau",stairType:"standard",stairWidthMm:1200,
-    balustradeType:"none",poolAdjacent:false,alfrescoZone:"none",bbqZone:"none",concreteFinish:"trowel",concreteTop:"bare",concreteHasBal:false,concreteServices:false,balFixing:"side"
+    balustradeType:"none",poolAdjacent:false,deckSupport:"timber",alfrescoZone:"none",bbqZone:"none",concreteFinish:"trowel",concreteTop:"bare",concreteHasBal:false,concreteServices:false,balFixing:"side"
   });
   const [errors,setErrors]=useState({});
   const upd=(k,v)=>setForm(p=>({...p,[k]:v}));
@@ -552,37 +552,49 @@ function App(){
 
       // ── SCREEN 2: What are you building ────────────────────────
       screen===2&&React.createElement("div",{className:"fade"},
-        jeff("What are you building?","Select a project type, describe what you have in mind, and tell me the size."),
+        jeff("What are you building?","Tell Jeff what you have in mind."),
         card(React.createElement("div",null,
           React.createElement("div",{style:{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:7,marginBottom:14}},
             PROJECT_TYPES.map(p=>React.createElement("button",{key:p,
-              style:{padding:"10px 4px",borderRadius:11,border:form.projectType===p?`2px solid ${Y}`:`1px solid ${BD}`,
-                background:form.projectType===p?"#FFF9E6":"white",fontSize:13,fontWeight:form.projectType===p?700:400},
-              onClick:()=>upd("projectType",p)},p))
+              onClick:()=>{upd("projectType",p);if(p!=="Deck"&&p!=="Concrete Slab")upd("deckSupport","");},
+              style:{padding:"12px 6px",borderRadius:12,fontSize:13,fontWeight:form.projectType===p?700:400,
+                border:form.projectType===p?`2px solid ${Y}`:`1px solid ${BD}`,
+                background:form.projectType===p?"#FFF9E6":"white",cursor:"pointer",textAlign:"center"}},p))
           ),
-          React.createElement("textarea",{value:form.description,onChange:e=>upd("description",e.target.value),
-            placeholder:`Describe your ${(form.projectType||"project").toLowerCase()} — style, features, anything specific...`,
-            style:{width:"100%",minHeight:72,border:`1px solid #111`,borderRadius:12,padding:10,fontSize:14,marginBottom:12}}),
-          React.createElement("div",{style:{fontSize:13,fontWeight:500,marginBottom:10}},"Dimensions"),
-          ["length","width"].map(k=>React.createElement("div",{key:k,style:{marginBottom:10}},
-            React.createElement("div",{style:{fontSize:12,color:"#888",marginBottom:4}},k==="length"?"Length":"Width"),
-            React.createElement("div",{style:{display:"flex",gap:8,alignItems:"center"}},
-              React.createElement("button",{style:{width:46,height:46,border:`1px solid ${BD}`,borderRadius:10,fontSize:22,background:"white"},
-                onClick:()=>upd(k,(Math.max(1,parseFloat(form[k]||0)-0.5)).toFixed(1))},"-"),
-              React.createElement("div",{style:{flex:1,textAlign:"center",fontSize:20,fontWeight:700}},form[k],"m"),
-              React.createElement("button",{style:{width:46,height:46,border:`1px solid ${BD}`,borderRadius:10,fontSize:22,background:"white"},
-                onClick:()=>upd(k,(parseFloat(form[k]||0)+0.5).toFixed(1))},"+")
+          form.projectType==="Deck"&&React.createElement("div",null,
+            React.createElement("div",{style:{fontSize:13,fontWeight:600,color:"#555",marginBottom:10,marginTop:4}},
+              "What is it sitting on?"),
+            React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}},
+              React.createElement("button",{
+                onClick:()=>upd("deckSupport","timber"),
+                style:{padding:"18px 10px",borderRadius:14,fontSize:14,fontWeight:form.deckSupport==="timber"?700:400,
+                  border:form.deckSupport==="timber"?`2px solid ${Y}`:`1px solid ${BD}`,
+                  background:form.deckSupport==="timber"?"#FFF9E6":"white",cursor:"pointer",textAlign:"left"}},
+                React.createElement("div",{style:{fontSize:15,fontWeight:600,marginBottom:4}},"Timber frame"),
+                React.createElement("div",{style:{fontSize:11,color:"#888"}},"Bearers, joists, footings")
+              ),
+              React.createElement("button",{
+                onClick:()=>upd("deckSupport","concrete"),
+                style:{padding:"18px 10px",borderRadius:14,fontSize:14,fontWeight:form.deckSupport==="concrete"?700:400,
+                  border:form.deckSupport==="concrete"?`2px solid ${Y}`:`1px solid ${BD}`,
+                  background:form.deckSupport==="concrete"?"#FFF9E6":"white",cursor:"pointer",textAlign:"left"}},
+                React.createElement("div",{style:{fontSize:15,fontWeight:600,marginBottom:4}},"Concrete slab"),
+                React.createElement("div",{style:{fontSize:11,color:"#888"}},"Slab on compacted ground")
+              )
             )
-          )),
-          React.createElement("div",{style:{textAlign:"center",fontSize:13,color:"#777",marginTop:4}},
-            "Floor area: ",React.createElement("b",null,est.area.toFixed(1)," m²"))
+          )
         )),
-        React.createElement(PBtn,{label:"Continue",onClick:()=>go(3)}),
+        React.createElement(PBtn,{label:"Continue →",
+          onClick:()=>{
+            if(form.projectType==="Deck"&&form.deckSupport==="concrete") upd("projectType","Concrete Slab");
+            go(1);
+          },
+          disabled:!form.projectType||(form.projectType==="Deck"&&!form.deckSupport)
+        }),
         React.createElement(BackBtn,null)
       ),
 
-// ── SCREEN 3: Deck position ───────────────────────────────────
-      screen===3&&(form.projectType==="Deck"||form.projectType==="Concrete Slab")&&React.createElement("div",{className:"fade"},
+screen===3&&(form.projectType==="Deck"||form.projectType==="Concrete Slab")&&React.createElement("div",{className:"fade"},
         jeff("Where does your deck sit?","Tap to place it relative to the house."),
         card(React.createElement("div",{style:{display:"flex",flexDirection:"column",alignItems:"center",gap:12}},
           React.createElement("div",{style:{position:"relative",width:240,height:240,margin:"0 auto"}},

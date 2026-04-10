@@ -822,15 +822,20 @@ screen===3&&(form.projectType==="Deck"||form.projectType==="Concrete Slab")&&Rea
         jeff("Your slab","100mm N25 on compacted ground — Jeff calculates your materials."),
         card(React.createElement("div",null,
           React.createElement("div",{style:{fontSize:13,fontWeight:600,marginBottom:8,color:"#555"}},"Dimensions"),
-          React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:4}},
-            [["length","Length (m)","5.0"],["width","Width (m)","4.0"]].map(([k,lbl,ph])=>
+          React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:8}},
+            [["length","Length (m)",0.1,2,20],["width","Width (m)",0.1,1,15]].map(([k,lbl,step,mn,mx])=>
               React.createElement("div",{key:k},
-                React.createElement("div",{style:{fontSize:11,color:"#aaa",marginBottom:4}},lbl),
-                React.createElement("input",{type:"text",inputMode:"decimal",value:form[k],placeholder:ph,
-                  onChange:ev=>upd(k,ev.target.value),
-                  onBlur:ev=>{const v=parseFloat(ev.target.value);if(!isNaN(v))upd(k,(Math.round(v*10)/10).toFixed(1));},
-                  style:{width:"100%",padding:"10px",borderRadius:10,border:`1px solid ${BD}`,
-                    fontSize:16,boxSizing:"border-box",WebkitAppearance:"none"}})
+                React.createElement("div",{style:{fontSize:11,color:"#aaa",marginBottom:6}},lbl),
+                React.createElement("div",{style:{display:"flex",alignItems:"center",border:`1px solid ${BD}`,borderRadius:10,overflow:"hidden"}},
+                  React.createElement("button",{
+                    onClick:()=>{const v=Math.max(mn,Math.round((parseFloat(form[k]||5)-step)*10)/10);upd(k,v.toFixed(1));},
+                    style:{padding:"10px 14px",fontSize:18,fontWeight:300,background:"white",border:"none",cursor:"pointer",color:"#555"}},"−"),
+                  React.createElement("div",{style:{flex:1,textAlign:"center",fontSize:16,fontWeight:500,padding:"10px 0",background:"white"}},
+                    parseFloat(form[k]||5).toFixed(1)),
+                  React.createElement("button",{
+                    onClick:()=>{const v=Math.min(mx,Math.round((parseFloat(form[k]||5)+step)*10)/10);upd(k,v.toFixed(1));},
+                    style:{padding:"10px 14px",fontSize:18,fontWeight:300,background:"white",border:"none",cursor:"pointer",color:"#555"}},"+")
+                )
               )
             )
           ),
@@ -1107,8 +1112,9 @@ screen===3&&(form.projectType==="Deck"||form.projectType==="Concrete Slab")&&Rea
               add(e("rect",{x:OX,y:OY,width:deckWpx,height:deckDpx,
                 fill:"#FAFAF8",stroke:"#1a1a1a","stroke-width":"1.2"}));
 
-              // ── BOARD LINES (very light) ──────────────────────
+              // ── BOARD LINES (timber only) ────────────────────
               const isEW=D.boardDir==="EW";
+              if(!isConcrete){
               const bStep=Math.max(4, (isEW?D.decking.W:D.decking.W)*SC);
               const bCount=Math.floor((isEW?deckDpx:deckWpx)/bStep);
               for(let i=1;i<bCount;i++){
@@ -1118,15 +1124,50 @@ screen===3&&(form.projectType==="Deck"||form.projectType==="Concrete Slab")&&Rea
                   x2:isEW?OX+deckWpx:OX+p, y2:isEW?OY+p:OY+deckDpx,
                   stroke:"#e8e8e8","stroke-width":"0.5"}));
               }
+              } // end board lines timber only
 
-              // ── BEARER LINES ──────────────────────────────────
-              bRowYs.forEach(by=>add(e("line",{x1:OX,y1:by,x2:OX+deckWpx,y2:by,
-                stroke:"#bbb","stroke-width":"0.6"})));
+              // ── BEARER LINES + FOOTINGS (timber only) ─────────
+              if(!isConcrete){
+                bRowYs.forEach(by=>add(e("line",{x1:OX,y1:by,x2:OX+deckWpx,y2:by,
+                  stroke:"#bbb","stroke-width":"0.6"})));
+                bRowYs.forEach(by=>bColXs.forEach(bx=>{
+                  add(e("circle",{cx:bx,cy:by,r:4,fill:"#1a1a1a",stroke:"white","stroke-width":"1.2"}));
+                }));
+              }
 
-              // ── FOOTING DOTS ──────────────────────────────────
-              bRowYs.forEach(by=>bColXs.forEach(bx=>{
-                add(e("circle",{cx:bx,cy:by,r:4,fill:"#1a1a1a",stroke:"white","stroke-width":"1.2"}));
-              }));
+              // ── CONCRETE SLAB PLAN (control joints + edge beam) ──
+              if(isConcrete){
+                const CRl=R.draw.controlJointRowsL||0;
+                const CRd=R.draw.controlJointRowsD||0;
+                // Control joint lines along length
+                for(let i=1;i<=CRl;i++){
+                  const jy=OY+(i/(CRl+1))*deckDpx;
+                  add(e("line",{x1:OX,y1:jy,x2:OX+deckWpx,y2:jy,
+                    stroke:"#aaa","stroke-width":"0.6","stroke-dasharray":"6,3"}));
+                  add(e("text",{x:OX+4,y:jy-3,fontSize:6.5,fill:"#bbb"},"control joint"));
+                }
+                // Control joint lines along width
+                for(let i=1;i<=CRd;i++){
+                  const jx=OX+(i/(CRd+1))*deckWpx;
+                  add(e("line",{x1:jx,y1:OY,x2:jx,y2:OY+deckDpx,
+                    stroke:"#aaa","stroke-width":"0.6","stroke-dasharray":"6,3"}));
+                }
+                // Thickened edge beam indicator
+                if(form.concreteHasBal){
+                  add(e("rect",{x:OX-3,y:OY-3,width:deckWpx+6,height:deckDpx+6,
+                    fill:"none",stroke:"#555","stroke-width":"2.5"}));
+                  add(e("text",{x:OX+4,y:OY+deckDpx+14,fontSize:7,fill:"#888"},"thickened edge beam"));
+                }
+                // DPM note
+                add(e("text",{x:OX+deckWpx/2,y:OY+deckDpx/2-8,fontSize:9,fill:"#ccc",
+                  "text-anchor":"middle","font-weight":"500"},"100mm N25 slab"));
+                add(e("text",{x:OX+deckWpx/2,y:OY+deckDpx/2+8,fontSize:8,fill:"#ccc",
+                  "text-anchor":"middle"},"SL72 mesh · DPM"));
+                // Finish label
+                add(e("text",{x:OX+deckWpx/2,y:OY+deckDpx/2+22,fontSize:7.5,fill:"#ccc",
+                  "text-anchor":"middle"},
+                  form.concreteFinish==="broom"?"Broom finish":"Steel float finish"));
+              }
 
               // ── INSET STAIR (drawn last — on top of deck outline) ──
               if(sr&&isInset){
@@ -1217,6 +1258,80 @@ screen===3&&(form.projectType==="Deck"||form.projectType==="Concrete Slab")&&Rea
           // 5. Bearer: no label inside drawing
           // 6. No title line, no scale bar, no AS codes
           // 7. Text 1pt smaller throughout (8px → 7px, 9px → 8px)
+
+          // ── CONCRETE SECTION A-A ─────────────────────────
+          if(isConcrete){
+            const Lm=parseFloat(form.length)||5;
+            const Dm=parseFloat(form.width)||4;
+            const SC2=0.1;
+            const slabH=Math.max(8,100*SC2); // 100mm slab
+            const dpmH=3; // DPM layer
+            const groundH=30; // compacted ground
+            const beamW=form.concreteHasBal?Math.max(20,300*SC2):0;
+            const deckW=Dm*1000*SC2;
+            const ML2=80,MR2=160,MT2=40,MB2=50;
+            const CVS_W2=ML2+deckW+MR2;
+            const CVS_H2=MT2+groundH+dpmH+slabH+(form.concreteHasBal?8:0)+MB2;
+            const OX2=ML2;
+            const SLAB_TOP=MT2+groundH+dpmH;
+            const GL_Y=MT2+groundH;
+            const ns2="http://www.w3.org/2000/svg";
+            const e2=(tag,attrs,txt)=>{
+              const el=document.createElementNS(ns2,tag);
+              Object.entries(attrs).forEach(([k,v])=>el.setAttribute(k,String(v)));
+              if(txt!==undefined)el.textContent=txt;
+              return el;
+            };
+            return React.createElement("div",null,
+              React.createElement("div",{style:{fontSize:10,fontWeight:600,color:"#888",
+                textTransform:"uppercase",letterSpacing:1,marginBottom:8}},"Section A-A"),
+              React.createElement("div",{ref:ref=>{
+                if(!ref)return; ref.innerHTML="";
+                const svg=document.createElementNS(ns2,"svg");
+                svg.setAttribute("width","100%");
+                svg.setAttribute("viewBox",`0 0 ${CVS_W2} ${CVS_H2}`);
+                svg.style.cssText="display:block;background:white;border-radius:10px;border:1px solid #e5e5e5;margin-bottom:8px";
+                const add2=el=>svg.appendChild(el);
+                // Compacted ground hatch
+                add2(e2("rect",{x:OX2-10,y:GL_Y,width:deckW+20,height:groundH+10,fill:"#F0ECE4"}));
+                for(let i=0;i<12;i++) add2(e2("line",{x1:OX2-10+i*22,y1:GL_Y,x2:OX2-10+i*22-11,y2:GL_Y+groundH+10,stroke:"#bbb","stroke-width":"0.35"}));
+                // GL line
+                add2(e2("line",{x1:10,y1:GL_Y,x2:OX2+deckW+20,y2:GL_Y,stroke:"#1a1a1a","stroke-width":"1.2"}));
+                add2(e2("text",{x:8,y:GL_Y+4,fontSize:8,fill:"#1a1a1a","font-weight":"bold"},"GL"));
+                // DPM layer
+                add2(e2("rect",{x:OX2,y:GL_Y+groundH,width:deckW,height:dpmH,fill:"#E8F4E8",stroke:"#4A9A4A","stroke-width":"0.5","stroke-dasharray":"3,2"}));
+                // Concrete slab
+                add2(e2("rect",{x:OX2,y:SLAB_TOP,width:deckW,height:slabH,fill:"#E8E8E8",stroke:"#1a1a1a","stroke-width":"1"}));
+                // Concrete hatch
+                for(let i=1;i<4;i++) add2(e2("line",{x1:OX2,y1:SLAB_TOP+i*slabH/4,x2:OX2+deckW,y2:SLAB_TOP+i*slabH/4,stroke:"#ccc","stroke-width":"0.4"}));
+                // Mesh line at mid-slab
+                add2(e2("line",{x1:OX2+4,y1:SLAB_TOP+slabH*0.6,x2:OX2+deckW-4,y2:SLAB_TOP+slabH*0.6,stroke:"#888","stroke-width":"0.8","stroke-dasharray":"4,3"}));
+                // Thickened edge beam
+                if(form.concreteHasBal){
+                  add2(e2("rect",{x:OX2-beamW,y:SLAB_TOP-4,width:beamW,height:slabH+8,fill:"#D8D8D8",stroke:"#1a1a1a","stroke-width":"0.8"}));
+                  add2(e2("rect",{x:OX2+deckW,y:SLAB_TOP-4,width:beamW,height:slabH+8,fill:"#D8D8D8",stroke:"#1a1a1a","stroke-width":"0.8"}));
+                }
+                // Surface finish line
+                add2(e2("line",{x1:OX2,y1:SLAB_TOP,x2:OX2+deckW,y2:SLAB_TOP,stroke:"#1a1a1a","stroke-width":"1.2"}));
+                // Labels right
+                const LPAD2=OX2+deckW+(form.concreteHasBal?beamW:0)+10;
+                [
+                  {y:SLAB_TOP+slabH/2,t:"100mm N25 slab"},
+                  {y:SLAB_TOP+slabH*0.6,t:"SL72 mesh"},
+                  {y:GL_Y+groundH/2,t:"DPM 0.2mm poly"},
+                  {y:GL_Y+groundH*0.3,t:"Compacted ground"},
+                ].forEach(({y,t})=>{
+                  add2(e2("text",{x:LPAD2,y:y+3,fontSize:8,fill:"#1a1a1a","font-weight":"500"},t));
+                });
+                if(form.concreteHasBal) add2(e2("text",{x:LPAD2,y:SLAB_TOP-2,fontSize:7.5,fill:"#888"},"300x300 edge beam"));
+                add2(e2("text",{x:OX2+deckW/2,y:SLAB_TOP+slabH+14,fontSize:8,fill:"#333","text-anchor":"middle"},`${Dm}m`));
+                // Finish note
+                add2(e2("text",{x:OX2+deckW/2,y:SLAB_TOP-6,fontSize:7,fill:"#aaa","text-anchor":"middle"},
+                  form.concreteFinish==="broom"?"Broom finish":"Steel float finish"));
+                ref.appendChild(svg);
+              }})
+            );
+          }
 
           const BALpx=D.hasBal?Math.max(40,D.balH*SC):0;
           const ML=130,MR=185,MT=D.hasBal?BALpx+30:30,MB=60;

@@ -538,10 +538,26 @@ function jeffFixNote(bk){
 
 // Pick best render image based on user choices
 function getRenderImage(form){
+  const isConcrete=form.projectType==="Concrete Slab";
+  const hasBal=form.balustradeType&&form.balustradeType!=="none"||form.concreteHasBal;
+  const top=form.concreteTop||"bare";
+
+  // ── CONCRETE SLAB renders ─────────────────────────────
+  if(isConcrete){
+    // Rule: select by what's on top + balustrade
+    // All from /renders/ folder on GitHub
+    const base="${SLAB_BASE}";
+    if(top==="timber"&&hasBal) return{src:base+"slab-timber-bal.jpg",type:"jpg"};
+    if(top==="timber")         return{src:base+"slab-timber.jpg",type:"jpg"};
+    if(top==="tile"&&hasBal)   return{src:base+"slab-tiled-bal.jpg",type:"jpg"};
+    if(top==="tile")           return{src:base+"slab-tiled.jpg",type:"jpg"};
+    if(top==="paver")          return{src:base+"slab-paver.jpg",type:"jpg"};
+    if(hasBal)                 return{src:base+"slab-bare-bal.jpg",type:"jpg"};
+    return{src:base+"slab-timber.jpg",type:"jpg"}; // default to timber for now
+  }
+
+  // ── TIMBER DECK renders ───────────────────────────────
   const hasStairs=form.stairType!=="none";
-  const hasBal=form.balustradeType&&form.balustradeType!=="none";
-  // Image 1: balustrade, no prominent stairs = render-deck-balustrade.jpg
-  // Image 3: stairs prominent, raised = render-deck-stairs.png
   if(hasStairs&&form.deckLevel==="raised") return{src:"render-deck-stairs.png",type:"png"};
   if(hasBal) return{src:"render-deck-balustrade.jpg",type:"jpg"};
   if(hasStairs) return{src:"render-deck-stairs.png",type:"png"};

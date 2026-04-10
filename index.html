@@ -993,7 +993,7 @@ screen===3&&(form.projectType==="Deck"||form.projectType==="Concrete Slab")&&Rea
               "75×35 hardwood grounds drilled and plugged at 450mm ctrs. 50mm screws."
             ),
             React.createElement("div",{style:{fontSize:11,color:"#aaa",marginBottom:6,fontWeight:500}},"Select decking board"),
-            boardGroups.map(([grpLabel,bks])=>React.createElement("div",{key:grpLabel,style:{marginBottom:8}},
+            boardGroups.map(({group:grpLabel,keys:bks})=>React.createElement("div",{key:grpLabel,style:{marginBottom:8}},
               React.createElement("div",{style:{fontSize:9,fontWeight:600,color:"#bbb",textTransform:"uppercase",letterSpacing:1,marginBottom:5}},grpLabel),
               bks.map(bk=>{const b=BOARDS[bk];return React.createElement("button",{key:bk,
                 onClick:()=>upd("deckingType",bk),

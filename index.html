@@ -985,38 +985,27 @@ screen===3&&(form.projectType==="Deck"||form.projectType==="Concrete Slab")&&Rea
                   background:form.concreteTop===k?"#FFF9E6":"white",cursor:"pointer"}},l)
             )
           ),
-          form.concreteTop==="timber"&&React.createElement("div",{style:{
-            background:"#FFF9E6",border:"1px solid #EFD080",borderRadius:10,padding:"12px"}},
-            React.createElement("div",{style:{fontSize:12,color:"#555",marginBottom:8}},
+          form.concreteTop==="timber"&&React.createElement("div",null,
+            React.createElement("div",{style:{
+              background:"#FFF9E6",border:"1px solid #EFD080",borderRadius:10,
+              padding:"10px 12px",marginBottom:8,fontSize:12,color:"#555"}},
               React.createElement("span",{style:{fontWeight:600,color:"#B8860B"}},"Jeff: "),
               "75×35 hardwood grounds drilled and plugged at 450mm ctrs. 50mm screws."
             ),
-            React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center"}},
-              React.createElement("div",{style:{fontSize:13,color:"#555"}},
-                form.deckingType?(BOARDS[form.deckingType]?.label||"Select board"):
-                React.createElement("span",{style:{color:"#aaa"}},"No board selected")
-              ),
-              React.createElement("button",{
-                onClick:()=>upd("showBoardPicker",!form.showBoardPicker),
-                style:{padding:"8px 14px",borderRadius:8,fontSize:12,fontWeight:600,
-                  border:`1px solid ${BD}`,background:"white",cursor:"pointer"}},
-                form.showBoardPicker?"Done ✓":"Choose board →")
-            ),
-            form.showBoardPicker&&React.createElement("div",{style:{marginTop:10}},
-              boardGroups.map(([grpLabel,bks])=>React.createElement("div",{key:grpLabel,style:{marginBottom:8}},
-                React.createElement("div",{style:{fontSize:9,fontWeight:600,color:"#bbb",textTransform:"uppercase",letterSpacing:1,marginBottom:5}},grpLabel),
-                bks.map(bk=>{const b=BOARDS[bk];return React.createElement("button",{key:bk,
-                  onClick:()=>{upd("deckingType",bk);upd("showBoardPicker",false);},
-                  style:{display:"flex",justifyContent:"space-between",alignItems:"center",
-                    width:"100%",padding:"9px 10px",borderRadius:9,marginBottom:4,textAlign:"left",
-                    border:form.deckingType===bk?`2px solid ${Y}`:`1px solid ${BD}`,
-                    background:form.deckingType===bk?"#FFF9E6":"white",cursor:"pointer"}},
-                  React.createElement("span",{style:{fontSize:13,fontWeight:500}},b.label," ",
-                    React.createElement("span",{style:{fontSize:10,color:"#aaa"}},b.w,"mm")),
-                  React.createElement("span",{style:{fontSize:12,fontWeight:600}},"$",b.rate,"/lm")
-                );})
-              ))
-            )
+            React.createElement("div",{style:{fontSize:11,color:"#aaa",marginBottom:6,fontWeight:500}},"Select decking board"),
+            boardGroups.map(([grpLabel,bks])=>React.createElement("div",{key:grpLabel,style:{marginBottom:8}},
+              React.createElement("div",{style:{fontSize:9,fontWeight:600,color:"#bbb",textTransform:"uppercase",letterSpacing:1,marginBottom:5}},grpLabel),
+              bks.map(bk=>{const b=BOARDS[bk];return React.createElement("button",{key:bk,
+                onClick:()=>upd("deckingType",bk),
+                style:{display:"flex",justifyContent:"space-between",alignItems:"center",
+                  width:"100%",padding:"9px 10px",borderRadius:9,marginBottom:4,textAlign:"left",
+                  border:form.deckingType===bk?`2px solid ${Y}`:`1px solid ${BD}`,
+                  background:form.deckingType===bk?"#FFF9E6":"white",cursor:"pointer"}},
+                React.createElement("span",{style:{fontSize:13,fontWeight:500}},b.label," ",
+                  React.createElement("span",{style:{fontSize:10,color:"#aaa"}},b.w,"mm")),
+                React.createElement("span",{style:{fontSize:12,fontWeight:600}},"$",b.rate,"/lm")
+              );})
+            ))
           )
         )),
         card(React.createElement("div",null,

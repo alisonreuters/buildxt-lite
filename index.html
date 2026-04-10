@@ -985,10 +985,31 @@ screen===3&&(form.projectType==="Deck"||form.projectType==="Concrete Slab")&&Rea
                   background:form.concreteTop===k?"#FFF9E6":"white",cursor:"pointer"}},l)
             )
           ),
-          form.concreteTop==="timber"&&React.createElement("div",{style:{
-            background:"#FFF9E6",border:"1px solid #EFD080",borderRadius:10,padding:"10px 12px",fontSize:12,color:"#555"}},
-            React.createElement("span",{style:{fontWeight:600,color:"#B8860B"}},"Jeff: "),
-            "75×35 hardwood timber grounds drilled and plugged into slab at 450mm ctrs. Use 50mm decking screws. Select your board type."
+          form.concreteTop==="timber"&&React.createElement("div",null,
+            React.createElement("div",{style:{
+              background:"#FFF9E6",border:"1px solid #EFD080",borderRadius:10,padding:"10px 12px",fontSize:12,color:"#555",marginBottom:10}},
+              React.createElement("span",{style:{fontWeight:600,color:"#B8860B"}},"Jeff: "),
+              "75×35 hardwood timber grounds drilled and plugged at 450mm ctrs. 50mm decking screws."
+            ),
+            React.createElement("div",{style:{fontSize:12,color:"#aaa",marginBottom:8,fontWeight:500}},"Select your decking board"),
+            boardGroups.map(([grpLabel,bks])=>React.createElement("div",{key:grpLabel,style:{marginBottom:10}},
+              React.createElement("div",{style:{fontSize:10,fontWeight:600,color:"#bbb",textTransform:"uppercase",letterSpacing:1,marginBottom:6}},grpLabel),
+              bks.map(bk=>{const b=BOARDS[bk];return React.createElement("button",{key:bk,
+                onClick:()=>upd("deckingType",bk),
+                style:{display:"flex",justifyContent:"space-between",alignItems:"center",
+                  width:"100%",padding:"10px 12px",borderRadius:11,marginBottom:5,textAlign:"left",
+                  border:form.deckingType===bk?`2px solid ${Y}`:`1px solid ${BD}`,
+                  background:form.deckingType===bk?"#FFF9E6":"white",cursor:"pointer"}},
+                React.createElement("div",null,
+                  React.createElement("span",{style:{fontSize:14,fontWeight:500}},b.label," "),
+                  React.createElement("span",{style:{fontSize:11,color:"#aaa"}},b.w,"mm")
+                ),
+                React.createElement("div",{style:{textAlign:"right"}},
+                  React.createElement("div",{style:{fontSize:13,fontWeight:600}},"$",b.rate,"/lm"),
+                  b.supplier&&React.createElement("div",{style:{fontSize:10,color:"#4A7C59"}},b.supplier)
+                )
+              );})
+            ))
           )
         )),
         card(React.createElement("div",null,

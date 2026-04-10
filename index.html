@@ -466,6 +466,42 @@ function structRules(L,D,hmm,hasBal,boardDir){
 
 function calcEstimate(f){
   const L=parseFloat(f.length)||5,D=parseFloat(f.width)||4,area=L*D;
+
+  // ── CONCRETE SLAB ESTIMATE ────────────────────────────
+  if(f.projectType==="Concrete Slab"||f.deckSupport==="concrete"){
+    const thickness=0.1; // 100mm
+    const perimM=(L+D)*2;
+    const slabM3=Math.ceil(area*thickness*1.1*10)/10; // 10% waste
+    const edgeBeamM3=f.concreteHasBal?Math.ceil(perimM*0.3*0.3*10)/10:0;
+    const totalM3=Math.round((slabM3+edgeBeamM3)*10)/10;
+    const meshSheets=Math.ceil(area*1.15/14.4);
+    const barChairs=Math.ceil(area*3);
+    const dpmM2=Math.ceil(area*1.15);
+    const formworkLM=Math.ceil(perimM);
+    // Battens if timber on top
+    const hasTimberTop=f.concreteTop==="timber";
+    const battenLM=hasTimberTop?Math.ceil((area/(0.45))*(L)):0;
+    const deckingLM=hasTimberTop?(()=>{
+      const bk=f.deckingType||"merbau";const board=BOARDS[bk];
+      return Math.ceil(area/((board.w+board.gap)/1000)*1.10);
+    })():0;
+    const items=[
+      {cat:"Concrete",label:"Ready-mix concrete N25 — truck delivery",qty:totalM3,unit:"m³",rate:220,note:`${area.toFixed(1)}m² × 100mm + waste`},
+      {cat:"Concrete",label:"SL72 reinforcing mesh",qty:meshSheets,unit:"sheets",rate:85,note:"14.4m² sheets"},
+      {cat:"Concrete",label:"Bar chairs (mesh supports)",qty:barChairs,unit:"EA",rate:0.80},
+      {cat:"Concrete",label:"DPM 0.2mm poly sheet",qty:dpmM2,unit:"m²",rate:1.20},
+      {cat:"Concrete",label:"Edge formwork boards",qty:formworkLM,unit:"LM",rate:8},
+      f.concreteHasBal?{cat:"Concrete",label:"Thickened edge beam (balustrade)",qty:edgeBeamM3,unit:"m³",rate:220,note:"300×300mm perimeter"}:null,
+      hasTimberTop?{cat:"Battens",label:"75×35 hardwood timber grounds",qty:battenLM,unit:"LM",rate:4.50,note:"drilled + plugged @ 450mm ctrs"}:null,
+      hasTimberTop?{cat:"Battens",label:"Concrete anchors + plugs",qty:Math.ceil(battenLM/0.45),unit:"EA",rate:1.20}:null,
+      hasTimberTop&&deckingLM>0?{cat:"Decking",label:`${(BOARDS[f.deckingType||"merbau"]).label} decking`,qty:deckingLM,unit:"LM",rate:(BOARDS[f.deckingType||"merbau"]).price}:null,
+      f.concreteHasBal?{cat:"Features",label:"Balustrade allowance",qty:Math.ceil(perimM*0.6),unit:"LM",rate:180}:null,
+      {cat:"Labour",label:"Concrete pour + finish",qty:area,unit:"m²",rate:45,note:"incl. pump if required"},
+    ].filter(Boolean);
+    const total=items.reduce((s,i)=>s+(i.qty||0)*(i.rate||0),0);
+    return{items,total,area,cats:[...new Set(items.map(i=>i.cat))],ratePerM2:area>0?total/area:0,
+      rules:{nSteps:1,riser:100,nFootings:0,nBearerRows:0,nPostsPerBearer:0,joistLabel:"",high:false}};
+  }
   const raised=f.deckLevel==="raised",hmm=Number(f.heightMm)||300;
   const bk=f.deckingType||"merbau",board=BOARDS[bk];
   const hasBal=f.balustradeType&&f.balustradeType!=="none";
@@ -538,7 +574,7 @@ function jeffFixNote(bk){
 
 // Pick best render image based on user choices
 function getRenderImage(form){
-  const isConcrete=form.projectType==="Concrete Slab";
+  const isConcrete=form.projectType==="Concrete Slab"||form.deckSupport==="concrete";
   const hasBal=form.balustradeType&&form.balustradeType!=="none"||form.concreteHasBal;
   const top=form.concreteTop||"bare";
 
@@ -557,11 +593,8 @@ function getRenderImage(form){
   }
 
   // ── TIMBER DECK renders ───────────────────────────────
-  const hasStairs=form.stairType!=="none";
-  if(hasStairs&&form.deckLevel==="raised") return{src:"render-deck-stairs.png",type:"png"};
-  if(hasBal) return{src:"render-deck-balustrade.jpg",type:"jpg"};
-  if(hasStairs) return{src:"render-deck-stairs.png",type:"png"};
-  return{src:"render-deck-balustrade.jpg",type:"jpg"};
+  // render-deck-stairs.png = inset stairs + balustrade (main deck render)
+  return{src:"render-deck-stairs.png",type:"png"};
 }
 
 function App(){
@@ -583,7 +616,7 @@ function App(){
   const back=()=>{setErrors({});setScreen(s=>Math.max(1,s-1));};
   const est=useMemo(()=>calcEstimate(form),[form]);
   const wind=useMemo(()=>getWindRegion(form.postcode),[form.postcode]);
-  const render=useMemo(()=>getRenderImage(form),[form.stairType,form.deckLevel,form.balustradeType]);
+  const render=useMemo(()=>getRenderImage(form),[form.stairType,form.deckLevel,form.balustradeType,form.projectType,form.concreteTop,form.concreteHasBal]);
 
   useEffect(()=>{
     SB.auth.getSession().then(({data:{session}})=>{
@@ -699,6 +732,19 @@ function App(){
       // ── SCREEN 2: What are you building ────────────────────────
       screen===2&&React.createElement("div",{className:"fade"},
         jeff("What are you building?","Tell Jeff what you have in mind."),
+        card(React.createElement("div",null,
+          React.createElement("div",{style:{fontSize:13,fontWeight:600,marginBottom:8,color:"#555"}},"Describe what you have in mind"),
+          React.createElement("textarea",{
+            value:form.description||"",
+            onChange:ev=>upd("description",ev.target.value),
+            placeholder:"e.g. Ground level deck off back of house, timber boards, balustrade one side...",
+            rows:3,
+            style:{width:"100%",padding:"10px",borderRadius:10,border:`1px solid ${BD}`,
+              fontSize:14,resize:"none",boxSizing:"border-box",fontFamily:"inherit",lineHeight:1.5}
+          }),
+          React.createElement("div",{style:{fontSize:11,color:"#aaa",marginTop:6}},
+            "Jeff uses this to check your selections make sense — he won’t change the core works.")
+        )),
         card(React.createElement("div",null,
           React.createElement("div",{style:{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:7,marginBottom:14}},
             PROJECT_TYPES.map(p=>React.createElement("button",{key:p,
@@ -1107,7 +1153,7 @@ screen===3&&(form.projectType==="Deck"||form.projectType==="Concrete Slab")&&Rea
           )
         )),
         card((()=>{
-          const isConcrete=form.projectType==="Concrete Slab";
+          const isConcrete=form.projectType==="Concrete Slab"||form.deckSupport==="concrete";
           const R=isConcrete
             ? calcConcreteSlab({
                 Lm:parseFloat(form.length)||5,
@@ -1390,7 +1436,7 @@ screen===3&&(form.projectType==="Deck"||form.projectType==="Concrete Slab")&&Rea
       screen===6&&React.createElement("div",{className:"fade"},
         jeff("Section A-A","Calculated from your inputs."),
         card((()=>{
-          const isConcrete=form.projectType==="Concrete Slab";
+          const isConcrete=form.projectType==="Concrete Slab"||form.deckSupport==="concrete";
           const R=isConcrete
             ? calcConcreteSlab({
                 Lm:parseFloat(form.length)||5,
@@ -1741,13 +1787,7 @@ screen===3&&(form.projectType==="Deck"||form.projectType==="Concrete Slab")&&Rea
           React.createElement("img",{src:render.src,alt:"3D set out of your deck",
             style:{width:"100%",display:"block",borderRadius:14},
             onError:e=>{e.target.style.display="none"}}),
-          React.createElement("div",{style:{background:"#1A1A1A",padding:"10px 14px",display:"flex",flexWrap:"wrap",gap:6}},
-            [form.deckLevel==="raised"?`Raised ${form.heightMm}mm`:"Ground level",
-             `${BOARDS[form.deckingType||"merbau"].label} decking`,
-             form.stairType!=="none"?`${est.rules.nSteps} risers @ ${est.rules.riser}mm`:"No stairs",
-             form.balustradeType!=="none"?form.balustradeType+" balustrade":"Open deck"
-            ].map(tag=>React.createElement("div",{key:tag,style:{background:Y,color:TX,fontSize:11,fontWeight:600,padding:"3px 10px",borderRadius:20}},tag))
-          )
+
         ),
         form.siteCondition==="work"&&warn("Site levelling not included in estimate — allow additional budget."),
         form.poolAdjacent&&warn("Pool fence rules apply (AS1926.1) — 1200mm min height, self-closing gate required."),

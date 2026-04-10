@@ -546,7 +546,7 @@ function getRenderImage(form){
   if(isConcrete){
     // Rule: select by what's on top + balustrade
     // All from /renders/ folder on GitHub
-    const base="${SLAB_BASE}";
+    const base="https://raw.githubusercontent.com/alisonreuters/buildxt-lite/main/renders/";
     if(top==="timber"&&hasBal) return{src:base+"slab-timber-bal.jpg",type:"jpg"};
     if(top==="timber")         return{src:base+"slab-timber.jpg",type:"jpg"};
     if(top==="tile"&&hasBal)   return{src:base+"slab-tiled-bal.jpg",type:"jpg"};
@@ -1019,7 +1019,7 @@ screen===3&&(form.projectType==="Deck"||form.projectType==="Concrete Slab")&&Rea
                   background:form.deckingType===bk?"#FFF9E6":"white",cursor:"pointer"}},
                 React.createElement("span",{style:{fontSize:13,fontWeight:500}},b.label," ",
                   React.createElement("span",{style:{fontSize:10,color:"#aaa"}},b.w,"mm")),
-                React.createElement("span",{style:{fontSize:12,fontWeight:600}},"$",b.rate,"/lm")
+                React.createElement("span",{style:{fontSize:12,fontWeight:600}},"$",b.price,"/lm")
               );})
             ))
           )

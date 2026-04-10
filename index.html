@@ -201,6 +201,139 @@ function deckSectionLayout(draw, SC, FFL_Y) {
   };
 }
 
+// ============================================================
+// BUILDXT CONCRETE SLAB RULES ENGINE v1.0
+// Assembly: Concrete slab on levelled compacted ground
+// Rules confirmed by Bob — builder perspective
+// ============================================================
+
+function calcConcreteSlab(inputs) {
+  const {
+    Lm, Dm,
+    hasBal,          // true/false — thickened edge beam if balustrade
+    finish,          // "trowel" | "broom" | "float"
+    hasServices,     // true/false — conduits, drainage pipes
+    houseWall,
+  } = inputs;
+
+  const deckAreaM2 = Lm * Dm;
+  const perimM = 2 * (Lm + Dm);
+
+  // ── RULE: SLAB THICKNESS ─────────────────────────────────
+  // 100mm non-load-bearing slab on compacted ground — confirmed
+  const thickness = 100; // mm, fixed
+
+  // ── RULE: CONCRETE GRADE ─────────────────────────────────
+  // 25 MPa standard — confirmed
+  const concreteGrade = "N25";
+
+  // ── RULE: CONCRETE VOLUME ─────────────────────────────────
+  const slabVolM3 = deckAreaM2 * (thickness / 1000);
+  // Thickened edge beam: 300x300mm — only if balustrade fitted
+  // Rule: balustrade post loads require thickened edge
+  const edgeBeamVolM3 = hasBal ? perimM * 0.3 * 0.3 : 0;
+  const totalConcreteM3 = Math.ceil((slabVolM3 + edgeBeamVolM3) * 1.1 * 10) / 10; // 10% waste
+
+  // ── RULE: REINFORCEMENT MESH ─────────────────────────────
+  // 1 layer SL72 — confirmed default
+  // Sheet size 6.0 x 2.4m = 14.4m2
+  // Allow 15% laps
+  const meshGrade = "SL72";
+  const meshSheets = Math.ceil(deckAreaM2 * 1.15 / 14.4);
+  // Bar chairs: 1 per 600mm grid = ~2.8/m2, round up
+  const barChairs = Math.ceil(deckAreaM2 * 3);
+  // Tie wire: 1 roll per 20 sheets approx
+  const tieWireRolls = Math.max(1, Math.ceil(meshSheets / 20));
+
+  // ── RULE: DPM ─────────────────────────────────────────────
+  // Recommended always — confirmed
+  // 0.2mm poly sheeting, allow 15% laps
+  const dpmM2 = Math.ceil(deckAreaM2 * 1.15);
+
+  // ── RULE: EXPANSION JOINTS ───────────────────────────────
+  // Every 4.5m in 100mm slab, 25mm width — confirmed
+  // Rule: joints run in both directions at 4.5m grid
+  const expJointRowsL = Math.max(0, Math.floor(Lm / 4.5) - 1); // along length
+  const expJointRowsD = Math.max(0, Math.floor(Dm / 4.5) - 1); // along depth
+  const expJointLM = (expJointRowsL * Dm) + (expJointRowsD * Lm);
+  // NOTE: use expansion joints OR control joints — not both
+  // Expansion joint = physical gap with compressible filler
+  // Control joint = tooled groove to encourage crack location
+  // Default to control joints for domestic slabs
+
+  // ── RULE: CONTROL JOINTS ─────────────────────────────────
+  // Same spacing as expansion joints — 4.5m grid
+  const controlJointLM = expJointLM; // same calculation
+  const useControlJoints = true;     // default for domestic
+  const useExpansionJoints = false;  // use one or the other
+
+  // ── RULE: FORMWORK ────────────────────────────────────────
+  // Edge boards only — slab on ground
+  const formworkLM = perimM;
+
+  // ── RULE: FINISH ──────────────────────────────────────────
+  // Steel machine trowel — smooth, ready to use
+  // Broom finish — if tiling over slab (better adhesion)
+  // Wood float — if tiling (open texture, good bond)
+  const finishRules = {
+    trowel: { label: "Steel machine trowel", tileReady: false,
+      note: "Smooth finish — suitable for direct use or painting" },
+    broom:  { label: "Broom finish", tileReady: true,
+      note: "Textured finish — recommended if tiling over slab" },
+    float:  { label: "Wood float finish", tileReady: true,
+      note: "Open texture — good tile adhesion, suitable for pavers" },
+  };
+  const selectedFinish = finishRules[finish] || finishRules.trowel;
+
+  // ── QUANTITIES ────────────────────────────────────────────
+  return {
+    inputs,
+    deckAreaM2,
+    concreteGrade,
+    meshGrade,
+    thickness,
+    finish: selectedFinish,
+    qty: {
+      concreteM3:     totalConcreteM3,
+      meshSheets,
+      barChairs,
+      tieWireRolls,
+      dpmM2,
+      formworkLM:     Math.ceil(formworkLM * 10) / 10,
+      controlJointLM: useControlJoints ? Math.ceil(controlJointLM * 10) / 10 : 0,
+      expJointLM:     useExpansionJoints ? Math.ceil(expJointLM * 10) / 10 : 0,
+      // Services — quantities TBD by user
+      conduitLM:      hasServices ? "measure on site" : 0,
+    },
+    draw: {
+      Lm, Dm, houseWall,
+      thickness, hasBal,
+      deckWmm: Lm*1000, deckDmm: Dm*1000,
+      boardDir:"EW", hasStairs:false,
+      stairFace:"S", stairWidthMm:1200, stair:null,
+      FFL:0, pierH:0,
+      controlJointRowsL: expJointRowsL,
+      controlJointRowsD: expJointRowsD,
+      joist:{D:90,W:45,spacingMm:450},
+      bearer:{W:45,label:""},
+      decking:{D:19,W:90},
+      facia:{W:19},
+      footing:{W:400,D:400,H:400},
+      sectionCutDir:"EW",
+    },
+    nBearerRows: 0,
+    notes: [
+      "100mm N25 slab on levelled compacted ground",
+      "1 layer SL72 mesh with bar chairs throughout",
+      "DPM recommended under all slabs — 0.2mm poly",
+      hasBal ? "300x300mm thickened edge beam for balustrade posts" : null,
+      useControlJoints ? `Control joints at 4.5m grid — ${Math.ceil(controlJointLM)}LM total` : null,
+      selectedFinish.tileReady ? "Surface ready for tiling — confirm adhesive with tiler" : null,
+      hasServices ? "Allow for conduit and drainage pipes — measure on site" : null,
+    ].filter(Boolean),
+  };
+}
+
 // ── END COMPONENTS ────────────────────────────
 const {useState,useMemo,useEffect,useCallback}=React;
 const Y="#F2B705",BG="#F7F7F7",TX="#1A1A1A",BD="#E5E5E5";
@@ -1009,7 +1142,7 @@ screen===3&&(form.projectType==="Deck"||form.projectType==="Concrete Slab")&&Rea
           const sectNS=D.sectionCutDir==="NS";
 
           // Footing grid
-          const bRowYs=Array.from({length:R.nBearerRows},(_,i)=>OY+(i/Math.max(1,R.nBearerRows-1))*deckDpx);
+          const bRowYs=Array.from({length:R.nBearerRows||0},(_,i)=>OY+(i/Math.max(1,R.nBearerRows-1))*deckDpx);
           const bColXs=Array.from({length:R.nPostsPerRow},(_,i)=>OX+(i/Math.max(1,R.nPostsPerRow-1))*deckWpx);
 
           const ns="http://www.w3.org/2000/svg";

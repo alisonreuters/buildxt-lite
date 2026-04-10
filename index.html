@@ -1463,23 +1463,27 @@ screen===3&&(form.projectType==="Deck"||form.projectType==="Concrete Slab")&&Rea
                 }
                 // Surface finish line
                 add2(e2("line",{x1:OX2,y1:SLAB_TOP,x2:OX2+deckW,y2:SLAB_TOP,stroke:"#1a1a1a","stroke-width":"1.2"}));
-                // Labels right — spaced to avoid overlap
                 const LPAD2=OX2+deckW+(form.concreteHasBal?beamW:0)+10;
-                // Steel float finish label at top (surface)
-                add2(e2("text",{x:LPAD2,y:SLAB_TOP-4,fontSize:7.5,fill:"#1a1a1a","font-weight":"500"},"Steel float finish"));
-                add2(e2("text",{x:LPAD2,y:SLAB_TOP+6,fontSize:7,fill:"#555"},"100mm 25MPa Slab"));
-                // Mesh at mid slab
+
+                // "Steel float finish / 100mm 25MPa Slab" — centred IN the slab, just above mid
+                add2(e2("text",{x:OX2+deckW/2,y:SLAB_TOP+slabH*0.38,fontSize:7.5,
+                  fill:"#555","text-anchor":"middle","font-weight":"500"},
+                  form.concreteFinish==="broom"?"Broom finish":"Steel float finish"));
+                add2(e2("text",{x:OX2+deckW/2,y:SLAB_TOP+slabH*0.38+11,fontSize:7,
+                  fill:"#777","text-anchor":"middle"},"100mm 25MPa Slab"));
+
+                // Right side labels — well spaced
+                // SL72 mesh — at mesh line
                 add2(e2("text",{x:LPAD2,y:SLAB_TOP+slabH*0.6+3,fontSize:7.5,fill:"#1a1a1a","font-weight":"500"},"SL72 mesh"));
-                // DPM just below slab
-                add2(e2("text",{x:LPAD2,y:GL_Y+groundH+dpmH+3,fontSize:7.5,fill:"#1a1a1a","font-weight":"500"},"DPM 0.2mm poly"));
-                // Compacted ground at bottom of hatch
-                add2(e2("text",{x:LPAD2,y:GL_Y+groundH*0.7+3,fontSize:7.5,fill:"#1a1a1a","font-weight":"500"},"Compacted ground"));
-                if(form.concreteHasBal) add2(e2("text",{x:LPAD2,y:SLAB_TOP+slabH+8,fontSize:7,fill:"#888"},"300×300 edge beam"));
+                // DPM — between slab base and ground hatch
+                add2(e2("text",{x:LPAD2,y:GL_Y+groundH+dpmH/2+2,fontSize:7.5,fill:"#1a1a1a","font-weight":"500"},"DPM 0.2mm poly"));
+                // Compacted ground — at excavated level (GL line, below DPM)
+                add2(e2("text",{x:LPAD2,y:GL_Y+groundH*0.5+3,fontSize:7.5,fill:"#1a1a1a","font-weight":"500"},"Compacted ground"));
+                if(form.concreteHasBal) add2(e2("text",{x:LPAD2,y:SLAB_TOP-4,fontSize:7,fill:"#888"},"300×300 edge beam"));
                 add2(e2("text",{x:OX2+deckW/2,y:SLAB_TOP+slabH+14,fontSize:8,fill:"#333","text-anchor":"middle"},`${Dm}m`));
                 // NTS label
                 add2(e2("text",{x:OX2,y:CVS_H2-8,fontSize:7,fill:"#bbb"},"NTS — layer depths indicative only"));
-                // Finish note — broom shows differently
-                form.concreteFinish==="broom"&&add2(e2("text",{x:LPAD2,y:SLAB_TOP-4,fontSize:7.5,fill:"#1a1a1a","font-weight":"500"},"Broom finish"));
+
                 // Bar chairs symbols
                 const chairSpacing=deckW/5;
                 for(let c2=0;c2<5;c2++){

@@ -609,7 +609,7 @@ function App(){
   const validate=(s)=>{
     const e={};
     if(s===1&&!/^\d{4}$/.test(form.postcode||""))e.postcode="Just need a valid 4-digit postcode to continue.";
-    if(s===5&&!form.siteCondition)e.siteCondition="Just let me know if the site is flat or needs some work first.";
+    if(s===5&&form.projectType!=="Concrete Slab"&&!form.siteCondition)e.siteCondition="Just let me know if the site is flat or needs some work first.";
     setErrors(e);return Object.keys(e).length===0;
   };
   const go=(s)=>{if(!validate(s))return;setScreen(x=>x+1);};
@@ -1142,8 +1142,8 @@ screen===3&&(form.projectType==="Deck"||form.projectType==="Concrete Slab")&&Rea
           const sectNS=D.sectionCutDir==="NS";
 
           // Footing grid
-          const bRowYs=Array.from({length:R.nBearerRows||0},(_,i)=>OY+(i/Math.max(1,R.nBearerRows-1))*deckDpx);
-          const bColXs=Array.from({length:R.nPostsPerRow},(_,i)=>OX+(i/Math.max(1,R.nPostsPerRow-1))*deckWpx);
+          const bRowYs=Array.from({length:R.nBearerRows||0},(_,i)=>OY+(i/Math.max(1,(R.nBearerRows||1)-1))*deckDpx);
+          const bColXs=Array.from({length:R.nPostsPerRow||0},(_,i)=>OX+(i/Math.max(1,(R.nPostsPerRow||1)-1))*deckWpx);
 
           const ns="http://www.w3.org/2000/svg";
           const e=(tag,attrs,txt)=>{
